@@ -81,11 +81,11 @@ def test_output_paths(tmp_path):
 
 def test_actual_sources_unchanged_and_outputs_deterministic():
     before = cli.source_state(ROOT)
-    cli.run_raw(ROOT)
+    cli.run_inventory(ROOT)
     report = ROOT / 'reports/eda/raw'
     files = [*report.rglob('*.json'), *report.rglob('*.csv')]
     first = {p: p.read_bytes() for p in files}
-    cli.run_raw(ROOT)
+    cli.run_inventory(ROOT)
     assert first == {p: p.read_bytes() for p in files}
     assert cli.source_state(ROOT) == before
 
@@ -97,4 +97,23 @@ def test_output_symlink_rejected(tmp_path, monkeypatch):
     monkeypatch.setattr(wui, 'inventory', lambda root, definitions: ([], []))
     (tmp_path / 'reports').symlink_to(ROOT / 'data', target_is_directory=True)
     with pytest.raises(ValueError, match='symlinks'):
-        cli.run_raw(tmp_path)
+        cli.run_inventory(tmp_path)
+
+
+@pytest.mark.parametrize('suffix', ['.tif', '.tfw', '.tif.xml', '.tif.aux.xml', '.tif.ovr'])
+def test_source_guard_covers_sidecars(tmp_path, suffix):
+    directory = tmp_path / dillon.DILLON_DIR
+    directory.mkdir(parents=True)
+    metadata = tmp_path / wui.METADATA
+    metadata.parent.mkdir(parents=True)
+    metadata.write_text('<metadata/>')
+    sidecar = directory / ('CONUS_BP' + suffix)
+    before = cli.source_state(tmp_path)
+    sidecar.write_bytes(b'original')
+    added = cli.source_state(tmp_path)
+    assert added != before
+    assert sidecar.relative_to(tmp_path).as_posix() in added
+    sidecar.write_bytes(b'modified content')
+    assert cli.source_state(tmp_path) != added
+    sidecar.unlink()
+    assert cli.source_state(tmp_path) == before

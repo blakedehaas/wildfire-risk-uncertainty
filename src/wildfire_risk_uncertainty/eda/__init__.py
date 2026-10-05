@@ -1,1 +1,1 @@
-"""Reproducible EDA; currently limited to structural source discovery."""
+"""Reproducible source discovery and Dillon statistical/spatial EDA."""

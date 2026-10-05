@@ -1,0 +1,2 @@
+total_pixels,valid_all_seven,valid_at_least_one,invalid_all_seven,mask_disagreements,masks_identical,method
+196008276,110809720,110819506,85188770,9786,False,exact full-resolution counts

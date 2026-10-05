@@ -1,8 +1,10 @@
-# Raw-source discovery — Checkpoint 1
+# Raw-data EDA — Checkpoints 1 and 2
 
-This is a structural/source-discovery report, **not the finished raw-data EDA**.
-No pixel distributions, feature values, predictive models, training dataset, or
-WUI-to-Dillon spatial join have been computed or selected.
+This report retains Checkpoint 1 structural discovery and adds **Checkpoint 2
+Dillon statistical/spatial EDA** below. It is not the finished raw-data EDA.
+No WUI value/temporal analysis, FLP-vector validation, entropy, dominant class,
+extreme-event threshold, predictive model, training dataset, or spatial join
+has been implemented or selected.
 
 Run from the repository root with the locally extracted sources listed in
 [data/SOURCES.md](../../../data/SOURCES.md):
@@ -14,22 +16,24 @@ uv run pytest
 uv run ruff check .
 ```
 
-The exact inventory command executed was `uv run wildfire-eda raw`.
+The exact command executed was `uv run wildfire-eda raw`: it now regenerates
+Checkpoint 1 inventory and Checkpoint 2 Dillon products. `uv run wildfire-eda
+dillon` regenerates Dillon analysis alone, without requiring WUI sources.
 `raw --root /path/to/repository` supports invocation from another directory.
-The command regenerates the small JSON/CSV inventories, not this interpretive
-README. It fails on missing required sources. Tests require those local sources;
+The command regenerates canonical JSON/CSV tables and PNG figures, not this
+interpretive README. It fails on missing required sources. Tests require those local sources;
 no data download occurs. Dependencies are locked in `uv.lock`; library and GDAL
 versions and the XML checksum are recorded in [inventory_run.json](inventory_run.json).
-No sampling or random seed is needed: the inventory is deterministic, with no
-run timestamps or absolute paths. Future EDA can extend the existing CLI and
-modules; statistics, plotting, and cross-dataset analysis are explicitly deferred.
+The structural inventory uses no sampling; Checkpoint 2 sampling is documented
+below. Canonical outputs omit run timestamps and absolute paths. Statistics and
+plotting modules now implement Dillon analysis; cross-dataset analysis remains deferred.
 
 `reports/eda/raw/` holds intentionally committed scientific products.
 `artifacts/eda/raw/` exists locally for disposable/large output and remains ignored.
 Empty figure directories and cross-dataset tables are retained with `.gitkeep`;
-there are no figures or cross-dataset results yet.
+Dillon figures now exist; WUI figures and cross-dataset results remain deferred.
 
-## Empirical Dillon inventory
+## Checkpoint 1: empirical Dillon inventory
 
 Source directory: `data/interim/dillon_2023/Data/I_FSim_CONUS_LF2020_270m/`.
 Each file was independently opened read-only with Rasterio. The full per-file
@@ -62,7 +66,7 @@ structural alignment only; it does not establish identical valid-data masks,
 probability semantics, or suitability of any aggregation. Overviews were listed,
 not used to compute statistics.
 
-## Empirical WUI database/schema inventory
+## Checkpoint 1: empirical WUI database/schema inventory
 
 Source: `data/interim/silvis_wui_2020/CONUS_WUI_block_1990_2020_change_v4_gcs_na83.gdb`.
 Pyogrio lists **one logical layer**:
@@ -99,7 +103,7 @@ XML `FIPS`. String fields have Pyogrio dtype `object` and OGR type `OFTString`.
 shape measurement fields are float64. These are schema types, not observed
 value distributions or verified domains.
 
-## Temporal evidence and documented semantics
+## Checkpoint 1: temporal evidence and documented semantics
 
 The supplied XML is
 `data/raw/silvis_wui_2020/CONUS_WUI_block_1990_2020_change_v4_metadata.xml`.
@@ -134,7 +138,7 @@ properties of every record.
   for interface assignment in **all four decades**. This is a documented
   temporal dependency, not a decision to use a particular modeling year.
 
-## Anomalies and unresolved scientific questions
+## Checkpoint 1: anomalies and unresolved scientific questions
 
 - `WUICLASS2020` is described as “2010” in its XML definition. The schema label
   and document scope point to 2020, but this conflict is retained, not corrected.
@@ -145,8 +149,9 @@ properties of every record.
 - Shape length/area are documented only as internal units and internal units
   squared. Do not infer that stored measurements have suitable physical units
   from the current geographic CRS; lineage and values need verification.
-- NoData-mask overlap, missing/sentinel WUI values, class completeness, block-ID
-  duplication, geometry validity, and numeric ranges have not been evaluated.
+- At Checkpoint 1, masks and values were unexamined. Checkpoint 2 below resolves
+  Dillon mask/range questions. WUI missing/sentinel values, class completeness,
+  block-ID duplication, geometry validity, and numeric ranges remain unexamined.
 - Dillon EPSG:5070 and WUI EPSG:4269 differ. Projection, polygon/raster support,
   area weighting, boundary treatment, and temporal compatibility require review.
   No final WUI-to-Dillon spatial join is selected.
@@ -154,17 +159,181 @@ properties of every record.
   labels do not independently establish the modeled fire-probability period.
   Dillon probability definitions and temporal provenance need metadata review.
 
-## Validation and next work
+## Checkpoint 2: methods and provenance
 
-Tests verify required files, actual raster alignment, deliberately mismatched
-headers, byte-preserving reads of synthetic rasters, schema/XML matching,
-output-path restrictions, reproducible output bytes, and unchanged source file
-sizes/mtimes across execution. The real-data guard is not a content checksum;
-full hashing of multi-gigabyte data is intentionally avoided. The XML checksum
-matches the source manifest. Real datasets are opened read-only.
+The analysis reads the seven aligned rasters once at full resolution in
+1,024 × 1,024 windows, using a 64 MiB GDAL block cache. No complete raster is
+loaded. All source files under `data/interim/dillon_2023/`, including TIFF,
+world-file, XML, auxiliary XML and overview sidecars, are protected by a recursive
+size/mtime snapshot before and after execution. Additions and deletions are also
+detected. GDAL persistent auxiliary metadata writes are disabled during analysis.
+This guard does not claim content-hash assurance for large real sources. Synthetic
+tests use byte hashes and explicitly exercise sidecar addition/modification/removal.
 
-Next checkpoint, subject to review: establish documented variable semantics,
-then implement bounded-memory raster statistics and masks, WUI value/domain/
-missingness and geometry diagnostics, temporal summaries, and scientific plots.
-Evaluate spatial/temporal integration options explicitly before choosing any
-join. No full statistical EDA or dataset construction is part of this checkpoint.
+**Full-raster quantities:** valid/invalid counts, extrema, range violations,
+zero counts, mask overlap patterns, and histogram bin counts use every native
+pixel. Means and population standard deviations use float64 merged central
+moments (`ddof=0`); “exact” here means full coverage rather than sampling, not
+infinite-precision arithmetic. Validity means GDAL mask valid **and finite**.
+NoData and any unmasked NaN/infinity are excluded; no unmasked nonfinite values
+were found in these sources.
+
+**Sampled quantities:** a fixed centered regular lattice uses every 15th row and
+column, starting at zero-based row/column 7 (4,050 m spacing). Requested maximum:
+1,000,000 locations; actual: **870,816**. Per-raster valid sample sizes are
+**492,525 for BP** and **492,491 for each FLP**. Common-valid sample:
+**492,489**. There is no RNG and no seed (recorded as null), so repeated runs select
+identical native pixels. The lattice can alias spatial structure; no sampling
+error bounds or independence assumptions are claimed.
+
+Interior quantiles (1, 5, 25, 50, 75, 95, 99%) use NumPy linear interpolation
+on float64-converted valid sample values. Quantile endpoints (0%, 100%) remain
+**exact full-raster extrema**. Pearson correlations and hexbin relationships use
+the common-valid lattice only. Choosing common-valid support for this diagnostic
+does not prescribe a future mask reconciliation or cross-dataset join.
+
+Histograms have exact counts in 100 linear bins spanning [0,1] and 120 logarithmic
+bins spanning [1e-12,1]. Bins are left-closed/right-open except the final bin,
+which includes its right edge. Zero counts are reported separately in log views;
+negative, above-one, and positive-below-1e-12 counts are explicit in the summary.
+All such overflow/underflow counts are zero here. Log panels show the occupied
+positive-bin range and do not change underlying values. Log-bin heights are counts,
+not probability densities. Histograms and means use each raster's own valid mask.
+
+Numerical maps use the same native-grid lattice collected during the streaming
+pass, never supplied PNG previews or precomputed overview values. Sampled invalid
+cells are gray. FLP maps share [0,1]; BP uses its exact [0,max] range. No valid
+values are clipped. Pixel-center coordinates determine the displayed lattice
+extent. These maps are representative decimations and can miss fine features or
+unsampled extremes. Coverage instead aggregates **every pixel** into 32 × 32
+native-cell bins (smaller at edges); disagreement markers enlarge affected-bin
+locations, with logarithmic fraction colors. Marker size does not represent area.
+
+All settings, histogram edges, versions, and methods are in
+[analysis_provenance.json](dillon/tables/analysis_provenance.json).
+`inventory_run.json` continues to describe only the Checkpoint 1 inventory.
+
+## Checkpoint 2: empirical results
+
+Every raster has **196,008,276** total pixels (17,372 × 11,283).
+Below are full-raster statistics except the explicitly sampled median/p99:
+
+| Raster | Valid | Invalid | Mean | Population std | Sample median | Sample p99 | Exact zero fraction |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| BP | 110,817,231 | 85,191,045 | 0.00299723 | 0.00716324 | 0.00050000 | 0.03542933 | 26.833% |
+| FLP1 | 110,811,995 | 85,196,281 | 0.19882098 | 0.33673480 | 0.00000000 | 1.00000000 | 51.961% |
+| FLP2 | 110,811,995 | 85,196,281 | 0.25331120 | 0.27681751 | 0.16666667 | 1.00000000 | 38.651% |
+| FLP3 | 110,811,995 | 85,196,281 | 0.16220482 | 0.20358870 | 0.02323009 | 0.66666669 | 47.467% |
+| FLP4 | 110,811,995 | 85,196,281 | 0.06259012 | 0.10792450 | 0.00000000 | 0.41237113 | 60.809% |
+| FLP5 | 110,811,995 | 85,196,281 | 0.03509779 | 0.09259334 | 0.00000000 | 0.44230768 | 73.094% |
+| FLP6 | 110,811,995 | 85,196,281 | 0.01965852 | 0.09495477 | 0.00000000 | 0.58182849 | 88.977% |
+
+BP is 56.537016% valid; each FLP is 56.534345% valid over the rectangular raster
+extent. These fractions are not fractions of CONUS land area. BP spans
+**0 to 0.13678333163261414**; each FLP spans **0 to 1**. All seven have
+**zero values below 0, zero above 1, and zero outside-range fraction**.
+The full table includes every requested quantile and all exact counts/method labels.
+
+### Exact mask comparison
+
+- Valid in all seven: **110,809,720**.
+- Valid in at least one: **110,819,506**.
+- Invalid in all seven: **85,188,770**.
+- Disagreement: **9,786** cells; masks are **not identical**.
+- **7,511** cells are BP-valid and invalid in all FLPs.
+- **2,275** cells are BP-invalid and valid in all FLPs.
+- The six FLP valid masks are exactly identical to each other.
+
+The mask-pattern table preserves all observed seven-bit patterns in BP, FLP1–6
+order. No mask reconciliation was applied to the per-raster statistics.
+The discrepancy locations are sparse at this national scale; their causes are
+unresolved and are not inferred from their appearance.
+
+### Distributions and spatial patterns
+
+Direct distribution findings: BP is strongly concentrated near zero with a long
+right tail: mean 0.00299723, sampled median 0.0005, sampled p95 0.01466667,
+sampled p99 0.03542933, and maximum 0.13678333. Its exact zero fraction is 26.833%.
+The log-bin view exposes low positive values that the linear histogram's first
+bin combines. No extreme-event threshold is defined by these descriptive quantiles.
+
+All FLPs include zeros and values up to one. FLP1 has sampled median zero and
+p95/p99 equal to one. FLP2 has the largest mean (0.25331120) and sampled median
+(0.16666667); FLP3 has sampled median 0.02323009. FLP4–6 concentrate increasingly
+at zero (60.809%, 73.094%, 88.977% respectively); FLP6 has sampled p75 zero yet
+p99 about 0.58182849, showing a sparse substantial right tail. These statements
+characterize individual distributions only, without asserting FLP-vector normalization.
+
+Direct map observations: higher BP patches are most visible in the western CONUS
+and southern Florida on the national linear scale, with much of the central and
+eastern map nearer zero. FLP1 has broad high-value patches in the eastern CONUS and upper Midwest;
+FLP3–5 show more visible positive structure in the west/central CONUS. FLP6
+has localized high-value patches in the west, along parts of the Gulf Coast,
+and in southern Florida. The FLP maps share a common scale. These are visual descriptions of a
+systematic decimation, not regional statistics or explanations of fire processes.
+
+### Pairwise relationships (sampled)
+
+BP Pearson r with FLP1–6 is respectively **−0.145905, +0.064683, +0.242198,
++0.314643, +0.337288, +0.303520**, using the 492,489 common-valid sample cells.
+Thus BP has a weak negative linear relationship with FLP1, little linear
+relationship with FLP2, and positive relationships with FLP3–6 in this sample.
+Hexbins show strong concentration at small BP and broad/nonlinear spreads;
+correlations do not imply causality, predictive performance, or independent
+observations. All seven-variable pairwise correlations are preserved in the table.
+No sums across the six FLPs, entropy, or dominant classes were calculated.
+
+### Canonical tables and figures
+
+Structural products retained:
+[rasters](dillon/tables/rasters.json), [alignment](dillon/tables/alignment.json).
+New tables:
+[distribution summary](dillon/tables/distribution_summary.csv),
+[mask overlap](dillon/tables/mask_overlap.csv),
+[mask patterns](dillon/tables/mask_patterns.csv),
+[exact histograms](dillon/tables/exact_histograms.csv),
+[sampled correlations](dillon/tables/sample_correlations.csv), and
+[analysis provenance](dillon/tables/analysis_provenance.json).
+
+| Variable | Numerical CONUS map (sampled) | Distribution (exact counts) |
+| --- | --- | --- |
+| BP | [Map](dillon/figures/bp_map.png) | [Histogram](dillon/figures/bp_distribution.png) |
+| FLP1 | [Map](dillon/figures/flp1_map.png) | [Histogram](dillon/figures/flp1_distribution.png) |
+| FLP2 | [Map](dillon/figures/flp2_map.png) | [Histogram](dillon/figures/flp2_distribution.png) |
+| FLP3 | [Map](dillon/figures/flp3_map.png) | [Histogram](dillon/figures/flp3_distribution.png) |
+| FLP4 | [Map](dillon/figures/flp4_map.png) | [Histogram](dillon/figures/flp4_distribution.png) |
+| FLP5 | [Map](dillon/figures/flp5_map.png) | [Histogram](dillon/figures/flp5_distribution.png) |
+| FLP6 | [Map](dillon/figures/flp6_map.png) | [Histogram](dillon/figures/flp6_distribution.png) |
+
+Additional canonical figures:
+
+- [FLP distribution comparison — exact counts](dillon/figures/flp_distributions_comparison.png)
+- [Positive-probability log distributions — exact counts](dillon/figures/probability_log_distributions.png)
+- [Valid coverage and disagreements — exact aggregated counts](dillon/figures/valid_coverage.png)
+- [BP–FLP relationships — common-valid sampled hexbin counts](dillon/figures/bp_flp_relationships.png)
+- [Pearson correlation matrix — sampled](dillon/figures/sample_correlations.png)
+
+## Validation and remaining scientific questions
+
+Tests use small synthetic sources for NoData/nonfinite exclusion, exact counts,
+mean/std, range violations, mask disagreement, deterministic selection and
+quantiles across window sizes, headless plot creation/closure, output paths,
+source content preservation, and byte-identical repeated products. Real-source
+integration checks stay at header/schema/file-state level; they do not repeatedly
+scan full rasters. The full CLI run separately verifies real source package
+sizes/mtimes remain unchanged. Figures were visually inspected for orientation,
+scales, coverage, and readable labels; tables were checked for count consistency.
+Runtime and peak memory are recorded in the completion message, not canonical outputs.
+
+The BP/FLP mask mismatch needs source-specific investigation before any choice
+of joint support. Source zeros remain valid numeric values; this checkpoint does
+not decide whether all zeros have identical physical meaning. Spatial lattice
+aliasing and decimation limit fine-scale interpretations. Spatial dependence
+precludes treating the sample as independent observations for inference.
+Dillon probability definitions and modeled time periods still need source-metadata
+confirmation before scientific integration. Checkpoint 1's WUI metadata conflicts
+remain unresolved. No WUI values were analyzed.
+
+Stop here for review. FLP-vector semantics/sums, entropy, dominant classes, WUI
+temporal analysis, cross-dataset joining, dataset construction, thresholds, and
+models remain outside this checkpoint.

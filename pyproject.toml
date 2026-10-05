@@ -5,6 +5,7 @@ description = "Research software for probabilistic wildfire risk prediction and 
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "matplotlib>=3.11.2",
     "numpy>=2.5.3",
     "pyogrio>=0.13.0",
     "rasterio>=1.5.2",

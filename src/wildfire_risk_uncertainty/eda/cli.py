@@ -1,4 +1,4 @@
-"""Canonical EDA entry point. Checkpoint 1 implements only source inventory."""
+"""Canonical EDA entry point. Source inventory plus Dillon statistical/spatial EDA."""
 
 import argparse
 import csv
@@ -17,11 +17,12 @@ def output_paths(root: Path) -> dict[str, Path]:
     return {name: root / "reports/eda/raw" / name / "tables" for name in ("dillon", "wui")}
 
 
-def source_state(root: Path) -> dict:
+def source_state(root: Path, include_wui: bool = True) -> dict:
     """Cheap mutation guard: size and mtime, not a full payload checksum."""
-    paths = [root / dillon.DILLON_DIR / name for name in dillon.FILENAMES]
-    paths += [root / wui.METADATA]
-    paths += sorted(p for p in (root / wui.GDB).rglob("*") if p.is_file())
+    paths = sorted(p for p in (root / "data/interim/dillon_2023").rglob("*") if p.is_file())
+    if include_wui:
+        paths += [root / wui.METADATA]
+        paths += sorted(p for p in (root / wui.GDB).rglob("*") if p.is_file())
     return {p.relative_to(root).as_posix(): (p.stat().st_size, p.stat().st_mtime_ns) for p in paths}
 
 
@@ -29,7 +30,7 @@ def write_json(path: Path, data) -> None:
     path.write_text(json.dumps(data, indent=2, sort_keys=True, allow_nan=False) + "\n")
 
 
-def run_raw(root: Path) -> None:
+def run_inventory(root: Path) -> None:
     root = root.resolve()
     before = source_state(root)
     rasters = dillon.inventory(root)
@@ -73,12 +74,32 @@ def run_raw(root: Path) -> None:
     })
     if source_state(root) != before:
         raise RuntimeError("Source size/mtime changed during report generation")
-    print("Structural inventory written to reports/eda/raw; statistical EDA is deferred.")
+    print("Structural inventory written to reports/eda/raw.")
+
+
+def run_dillon(root: Path) -> None:
+    root = root.resolve()
+    before = source_state(root, include_wui=False)
+    # Disable persistent GDAL auxiliary metadata writes and bound its block cache.
+    with rasterio.Env(GDAL_PAM_ENABLED="NO", GDAL_CACHEMAX=64 * 1024 * 1024):
+        result = dillon.analyze(root)
+        dillon.write_products(result, root)
+    if source_state(root, include_wui=False) != before:
+        raise RuntimeError("Dillon source package changed during analysis")
+    print("Dillon statistical/spatial products written to reports/eda/raw/dillon.")
+
+
+def run_raw(root: Path) -> None:
+    before = source_state(root)
+    run_inventory(root)
+    run_dillon(root)
+    if source_state(root) != before:
+        raise RuntimeError("Source package changed during raw EDA")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["raw"], help="Inventory headers/schema only")
+    parser.add_argument("command", choices=["raw", "dillon"], help="Source inventory + Dillon EDA, or Dillon EDA only")
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="Repository root (default: cwd)")
     args = parser.parse_args()
-    run_raw(args.root)
+    {"raw": run_raw, "dillon": run_dillon}[args.command](args.root)
