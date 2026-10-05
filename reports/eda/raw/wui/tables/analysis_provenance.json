@@ -1,0 +1,17 @@
+{
+  "BLK20_uniqueness": "disk-backed SQLite GROUP BY on all nonmissing IDs",
+  "attribute_geometry": "disabled",
+  "batch_size": 100000,
+  "numeric_extrema_counts": "full coverage",
+  "quantile_sampling": "global zero-based feature row index modulo 97 == 0",
+  "row_count": 9158401,
+  "row_unit": "feature/polygon row",
+  "spatial_sample": "10,000 deterministic FIDs across source range, read in geometry batches of 500; bounding-box centers",
+  "transition_states": [
+    "non-WUI",
+    "intermix",
+    "interface",
+    "missing",
+    "other"
+  ]
+}

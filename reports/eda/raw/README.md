@@ -1,8 +1,8 @@
-# Raw-data EDA — Checkpoints 1, 2, and 3A
+# Raw-data EDA — Checkpoints 1, 2, 3A, and 3B
 
 This report retains Checkpoint 1 structural discovery and Checkpoint 2
-Dillon statistical/spatial EDA, and adds **Checkpoint 3A FLP-vector semantics**.
-It is not the finished raw-data EDA.
+Dillon statistical/spatial EDA, and adds **Checkpoint 3A FLP-vector semantics** and **Checkpoint 3B SILVIS WUI
+value and temporal EDA**. It is not the finished raw-data EDA.
 
 Run from the repository root with the locally extracted sources listed in
 [data/SOURCES.md](../../../data/SOURCES.md):
@@ -10,6 +10,7 @@ Run from the repository root with the locally extracted sources listed in
 ```sh
 uv sync --locked
 uv run wildfire-eda raw
+uv run wildfire-eda wui
 uv run pytest
 uv run ruff check .
 ```
@@ -17,6 +18,7 @@ uv run ruff check .
 The exact command executed was `uv run wildfire-eda raw`: it now regenerates
 Checkpoint 1 inventory and Checkpoint 2 Dillon products. `uv run wildfire-eda
 dillon` regenerates Dillon analysis alone, without requiring WUI sources.
+`wildfire-eda wui` regenerates Checkpoint 3B without a Dillon scan.
 `raw --root /path/to/repository` supports invocation from another directory.
 The command regenerates canonical JSON/CSV tables and PNG figures, not this
 interpretive README. It fails on missing required sources. Tests require those local sources;
@@ -459,3 +461,159 @@ zonal mean FLPs also merit source clarification. The categorical summaries are
 valid descriptive calculations on the stated support, not a claim that all
 burnable cells have normalized vectors or that these probabilities measure
 uncertainty in a fitted prediction model.
+
+## Checkpoint 3B: SILVIS WUI empirical value and temporal EDA
+
+### Access, units, and metadata context
+
+The 9,158,401-row logical FileGDB layer was read in **100,000-row attribute-only
+batches** with Pyogrio raw arrays. No complete geometry-bearing dataset was loaded.
+Full-coverage counts, missingness, extrema, domains, categorical frequencies,
+transitions, and ID multiplicities use every feature row. Interior numeric
+quantiles use a deterministic sample of every 97th source feature row, with exact
+full-coverage extrema. `BLK20` multiplicities were grouped in a temporary
+SQLite database on disk. The 2020 spatial view samples 10,000 deterministic feature IDs in 500-geometry
+batches. These are bounding-box centers,
+not area-weighted or whole-polygon coverage. The WUI source size/mtime guard
+ran before and after analysis.
+
+**Every count and fraction in this section uses feature/polygon rows.** They
+are not land area, population, housing units, or unique Census blocks. Numeric
+HU/POP columns are values attached to rows; summing them over repeated `BLK20`
+identifiers is not justified as a national unique-block total. The source
+[metadata](wui/tables/metadata.json) defines WUIFLAG 0 as non-WUI, 1 as intermix,
+and 2 as interface; these labels are used below. Older HU1990/2000/2010 are
+**allocated** housing counts. Vegetation snapshots are **1992, 2001, 2011,
+2019**, not WUIFLAG's decennial years.
+
+### Direct empirical quality and composition
+
+All four WUIFLAG fields have **zero missing and zero other values**. The exact
+feature-row composition is:
+
+| Year | Non-WUI | Intermix | Interface | Interface fraction |
+| ---: | ---: | ---: | ---: | ---: |
+| 1990 | 7,269,987 | 741,273 | 1,147,141 | 12.526% |
+| 2000 | 7,203,741 | 674,832 | 1,279,828 | 13.974% |
+| 2010 | 7,132,007 | 660,576 | 1,365,818 | 14.913% |
+| 2020 | 7,117,813 | 643,442 | 1,397,146 | 15.255% |
+
+On this fixed feature set, interface rows increase by **250,005** from 1990
+to 2020, intermix rows decline by **97,831**, and non-WUI rows decline by
+**152,174**. These are classification counts, not measured WUI area change.
+
+All **14 documented WUICLASS categories** occur in each year; there are **no
+missing or undocumented categories**. `Med_Dens_Interface` grows from
+644,036 rows in 1990 to 784,302 in 2020; `High_Dens_NoVeg` grows from
+1,196,957 to 1,403,220; `Uninhabited_Veg` declines from 1,016,396 to
+816,446. The `Water` class remains 934,737 rows in each year. The source
+metadata's `WUICLASS2020` definition says “2010”; that labeling conflict is
+retained from Checkpoint 1 rather than resolved by these counts.
+
+The four exact row-level WUIFLAG transition matrices show substantial stability
+and both directions of change. From **1990 to 2020**, **8,444,749** rows retain
+their exact 0/1/2 state; **342,939** change from non-WUI to either WUI class,
+while **190,765** change from a WUI class to non-WUI. Intermix→interface is
+**151,322** versus interface→intermix **28,626**. Non-WUI→WUI counts for
+1990→2000, 2000→2010, and 2010→2020 are respectively **200,027**,
+**171,718**, and **92,226**; reverse counts are **133,781**, **99,984**,
+and **78,032**. These are same-row label transitions, not land-area transitions.
+
+### BLK20 uniqueness and data quality
+
+All 9,158,401 rows have a nonmissing `BLK20`, but only **8,089,668 unique IDs**.
+**7,100,652** IDs occur once; **989,016** appear multiple times; **2,057,749**
+rows belong to duplicated IDs; maximum multiplicity is **5**. Counts by
+multiplicity 1–5 are **7,100,652**, **910,749**, **76,828**, **1,428**, and **11**
+IDs. The metadata describes a public-land adjustment that can split polygons
+while retaining a block identifier. The observed duplicates are compatible
+with that process, but their individual causes have not been verified. No rows
+were deduplicated.
+
+All HU, HUDEN, vegetation, POP2020, OCCHU2020, VACHU2020, AWATER20PC,
+WATER20, STATE, and `fips` entries are nonmissing. **933,788 rows (10.196%)**
+are missing each of `POPDEN2020`, `OCCHUDEN2020`, and `VACHUDEN2020`.
+`PUBFLAG` is null on **8,703,638** rows and `BUFVEG` on **4,431,388**.
+Null is retained as null: the metadata does not document a sentinel or prove
+that null means false. Observed nonnull `PUBFLAG` values are 0 (231,988) and
+1 (222,775); nonnull `BUFVEG` values are 0 (3,219,252) and 1 (1,507,761).
+`WATER20` is 1 on 934,737 rows and 0 otherwise. There are 49 observed `STATE`
+codes and 3,108 observed `fips` values, with no nulls. Categorical frequencies
+and numeric summaries preserve the complete findings; the source definitions do
+not supply a closed STATE/FIPS domain here.
+
+No observed HU/POP counts or densities are negative. All four vegetation
+percentages and `AWATER20PC` fall within [0,100]. Flag and WUICLASS values
+match the documented observed domains. No sentinel meaning is inferred.
+
+### Housing, vegetation, and 2020-era values
+
+Sample medians for HU1990/2000/2010/2020 are **2, 3, 4, 4** housing units per
+feature row; sample p95 values are **44, 50, 56, 60**. The 1990→2020 row
+change has sample median **0** and p95 **+23**, with full observed range
+**−1,665 to +2,715**. Older HU values are source-allocated counts, whereas
+HU2020 is a 2020 total, so their changes should be read with that lineage in
+mind. The row-level figures are not unique-block housing totals.
+
+HUDEN medians rise from **7.02** (1990) to **10.54** (2000), **15.51** (2010),
+and **18.20 units/km²** (2020); p95 rises from **1,574.79** to **1,720.51**.
+The 1990→2020 row-change median is **0** and p95 **+617.71 units/km²**.
+Extreme density values occur: HUDEN1990's maximum is **22,441,488.57
+units/km²**, and the overall 1990→2020 change minimum is about **−20.18 million
+units/km²**. These tails need geometry/denominator investigation before use;
+small polygon area is plausible but has not been established as the cause.
+
+Vegetation sample medians for **1992/2001/2011/2019** are **6.48%, 1.33%,
+0.44%, 0.26%**. Each field spans 0–100%, with no missing or out-of-range
+rows. Sample p95 ranges from 100% in 1992 to 98.66% in 2019. The
+1992→2019 row-change median is **0 percentage points**, p95 **+11.22**, and
+full range **−100 to +100**. These years are not relabeled as the WUI census
+years or interpreted as a causal vegetation trend.
+
+For 2020, POP2020 has sample median **10**, p95 **149**, and maximum **8,727**
+persons per row. `POPDEN2020` has sample median **125.11 persons/km²** among
+nonnull rows and a maximum near **2.90 million persons/km²**. OCCHU2020 has
+median **3**, p95 **58**; VACHU2020 has median **0**, p95 **8**. The corresponding
+occupied/vacant densities have the missingness noted above. `AWATER20PC` has
+median **0%**, p95 **5.36%**, and range 0–100%. These are descriptive source
+values, not a finalized ML feature set.
+
+### Spatial view, implications, and unresolved issues
+
+The sampled 2020 map uses polygon bounding-box centers in EPSG:4269 and is
+labeled as a 10,000-feature deterministic FID sample. It offers a visual
+check of broad classification geography only. In this sample, interface points
+cluster visibly along parts of the eastern and southeastern United States and
+several western urban/coastal corridors; intermix points are more scattered.
+Center points may fall outside irregular polygons, and neither their count nor
+density measures land area.
+No rasterization onto the Dillon grid was performed.
+
+For a future `create_dataset.py`, the duplicate-ID pattern means row identity,
+block identity, and polygon support must be handled explicitly. Density nulls,
+`PUBFLAG`/`BUFVEG` null semantics, extreme densities, historic HU allocation,
+and differing vegetation/WUI years need decisions before feature construction.
+HU, housing density, vegetation, population, occupancy/vacancy, water, and
+public/buffer indicators are plausible scientific covariates, subject to a
+future design. `BLK20`, `fips`, and `STATE` are identifiers or administrative
+fields; they should not automatically become predictors. The prior 2.14 versus
+2.414 km `BUFVEG` metadata conflict also remains unresolved. No dataset,
+spatial join, split, or model was created.
+
+Canonical tables: [value summaries](wui/tables/value_summary.csv),
+[row changes](wui/tables/row_change_summary.csv),
+[categorical frequencies](wui/tables/categorical_frequencies.csv),
+[WUIFLAG composition](wui/tables/wuiflag_composition.csv),
+[WUICLASS composition](wui/tables/wuiclass_composition.csv),
+[transitions](wui/tables/wuiflag_transitions.csv),
+[BLK20 uniqueness](wui/tables/blk20_uniqueness.csv),
+[BLK20 multiplicity](wui/tables/blk20_multiplicity.csv), and
+[analysis provenance](wui/tables/analysis_provenance.json).
+Figures: [WUIFLAG proportions](wui/figures/wuiflag_composition.png),
+[counts](wui/figures/wuiflag_counts.png),
+[WUICLASS composition](wui/figures/wuiclass_composition.png),
+[transitions](wui/figures/wuiflag_transitions.png),
+[housing levels](wui/figures/housing_longitudinal.png),
+[housing changes](wui/figures/housing_changes.png),
+[vegetation levels](wui/figures/vegetation_longitudinal.png), and
+[2020 spatial sample](wui/figures/wui2020_spatial_sample.png).
