@@ -1,0 +1,28 @@
+# Raw research datasets
+data/raw/**
+!data/raw/.gitkeep
+
+# Generated / extracted datasets
+data/interim/**
+data/processed/**
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+# Large / disposable generated artifacts
+artifacts/**
+!artifacts/.gitkeep
+
+# Python environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Build / package outputs
+build/
+dist/
+*.egg-info/
