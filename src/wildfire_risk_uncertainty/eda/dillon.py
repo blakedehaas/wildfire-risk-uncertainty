@@ -80,6 +80,7 @@ def analyze(root: Path, requested=REQUESTED_SAMPLE_SIZE, window_size=WINDOW_SIZE
     import numpy as np
     from rasterio.windows import Window
 
+    from .flp_semantics import FLPDiagnostics
     from .statistics import Accumulator
 
     headers = inventory(root)
@@ -99,6 +100,8 @@ def analyze(root: Path, requested=REQUESTED_SAMPLE_SIZE, window_size=WINDOW_SIZE
         coverage_any = np.zeros(coverage_shape, dtype=np.int64)
         coverage_total = np.zeros(coverage_shape, dtype=np.int64)
         nonfinite = np.zeros(7, dtype=np.int64)
+        flp_diagnostics = FLPDiagnostics()
+        flp_sum_sample = np.full((len(rows), len(cols)), np.nan, dtype=np.float64)
         for top in range(0, height, window_size):
             for left in range(0, width, window_size):
                 h, w = min(window_size, height - top), min(window_size, width - left)
@@ -106,6 +109,7 @@ def analyze(root: Path, requested=REQUESTED_SAMPLE_SIZE, window_size=WINDOW_SIZE
                 bits = np.zeros((h, w), dtype=np.uint8)
                 ri = np.flatnonzero((rows >= top) & (rows < top + h))
                 ci = np.flatnonzero((cols >= left) & (cols < left + w))
+                blocks = []
                 for i, source in enumerate(sources):
                     block = source.read(1, window=window, masked=True)
                     finite = np.isfinite(block.data)
@@ -115,7 +119,17 @@ def analyze(root: Path, requested=REQUESTED_SAMPLE_SIZE, window_size=WINDOW_SIZE
                     accumulators[i].update(block.data[valid])
                     bits |= valid.astype(np.uint8) << i
                     values = np.where(valid, block.data, np.nan)
+                    blocks.append(values)
                     samples[i][np.ix_(ri, ci)] = values[np.ix_(rows[ri] - top, cols[ci] - left)]
+                flp_valid = (bits & 126) == 126
+                if np.any(flp_valid):
+                    flp_diagnostics.update(np.stack([b[flp_valid] for b in blocks[1:]]),
+                                           blocks[0][flp_valid])
+                sampled_flps = samples[1:, np.ix_(ri, ci)[0], np.ix_(ri, ci)[1]]
+                if sampled_flps.size:
+                    sample_valid = np.all(np.isfinite(sampled_flps), axis=0)
+                    flp_sum_sample[np.ix_(ri, ci)] = np.where(
+                        sample_valid, np.sum(sampled_flps.astype(np.float64), axis=0), np.nan)
                 patterns += np.bincount(bits.ravel(), minlength=128)
                 ys, xs = np.arange(0, h, COVERAGE_FACTOR), np.arange(0, w, COVERAGE_FACTOR)
                 target = np.s_[top // COVERAGE_FACTOR:math.ceil((top + h) / COVERAGE_FACTOR),
@@ -135,6 +149,7 @@ def analyze(root: Path, requested=REQUESTED_SAMPLE_SIZE, window_size=WINDOW_SIZE
         corr = np.corrcoef(common.astype(np.float64)) if common.shape[1] > 1 else np.full((7, 7), np.nan)
         return {
             'summaries': summaries, 'accumulators': accumulators, 'samples': samples,
+            'flp_diagnostics': flp_diagnostics, 'flp_sum_sample': flp_sum_sample,
             'common_sample': common, 'correlation': corr, 'patterns': patterns,
             'coverage_all': coverage_all, 'coverage_any': coverage_any,
             'coverage_total': coverage_total, 'bounds': list(sources[0].bounds),
@@ -151,6 +166,7 @@ def analyze(root: Path, requested=REQUESTED_SAMPLE_SIZE, window_size=WINDOW_SIZE
                 'map_strategy': 'native full-resolution lattice values collected during streaming; no supplied overviews',
                 'coverage_map': f'exact valid proportions in {COVERAGE_FACTOR}x{COVERAGE_FACTOR} native-cell bins; edge bins smaller; disagreement locations enlarged with logarithmic fraction colors',
                 'std_convention': 'population ddof=0; float64 parallel central-moment merge',
+                'flp_sum_states': 'zero exact; near_one abs(sum-1)<=1e-4; remaining positive below/above; sums in float64 without renormalization',
                 'histogram_convention': 'left-closed/right-open except final bin includes right edge; exact counts',
             },
         }
@@ -161,6 +177,8 @@ def write_products(result, root: Path):
     import csv
     import json
     from importlib.metadata import version
+
+    import numpy as np
 
     from . import plotting
     from .statistics import LINEAR_EDGES, LOG_EDGES
@@ -180,6 +198,72 @@ def write_products(result, root: Path):
             writer.writeheader()
             writer.writerows(rows)
 
+    from .flp_semantics import (
+        CATEGORICAL_TOLERANCE,
+        STATE_TOLERANCE,
+        TOLERANCES,
+        vector_metrics,
+    )
+
+    diagnostic = result['flp_diagnostics']
+    sample = result['flp_sum_sample']
+    total = diagnostic.sums.count
+    sum_row = diagnostic.sums.summary(total, sample)
+    sum_row.update(positive_count=diagnostic.positive, exact_one_count=diagnostic.exact_one)
+    csv_table('flp_sum_summary.csv', [sum_row])
+    dev_sample = np.abs(sample - 1)
+    dev_row = diagnostic.deviation.summary(total, dev_sample)
+    csv_table('flp_sum_deviation_summary.csv', [dev_row])
+    csv_table('flp_sum_tolerances.csv', [
+        {'tolerance': tolerance, 'within_count': int(count),
+         'within_fraction': int(count) / total, 'all_six_flp_valid_count': total}
+        for tolerance, count in zip(TOLERANCES, diagnostic.tolerances, strict=True)
+    ])
+    csv_table('flp_sum_states.csv', [
+        {'state': state, 'pixel_count': int(count), 'fraction': int(count) / total,
+         'state_tolerance': STATE_TOLERANCE}
+        for state, count in zip(('zero', 'positive_below_one_minus_tolerance',
+                                 'near_one', 'above_one_plus_tolerance'), diagnostic.states, strict=True)
+    ])
+    csv_table('bp_flp_sum_crosstab.csv', [
+        {'bp_state': bp, 'flp_state': state, 'pixel_count': int(diagnostic.crosstab[i, j]),
+         'state_tolerance': STATE_TOLERANCE}
+        for i, bp in enumerate(('BP_eq_0', 'BP_gt_0'))
+        for j, state in enumerate(('zero', 'near_one', 'other'))
+    ])
+    if diagnostic.categorical_justified():
+        flps = result['samples'][1:].astype(np.float64)
+        bp_sample = result['samples'][0]
+        valid = np.all(np.isfinite(flps), axis=0)
+        safe = np.where(valid, flps, 0)
+        _, deviation_sample, zero_sample, _, _, entropy_sample = vector_metrics(safe)
+        support_sample = (valid & (bp_sample > 0) & ~zero_sample &
+                          (deviation_sample <= CATEGORICAL_TOLERANCE) &
+                          np.all((safe >= 0) & (safe <= 1), axis=0))
+        maximum_sample = np.max(safe, axis=0)[support_sample]
+        entropy_sample = entropy_sample[support_sample]
+        max_row = diagnostic.max_probability.summary(diagnostic.categorical_count, maximum_sample)
+        entropy_row = diagnostic.entropy.summary(diagnostic.categorical_count, entropy_sample)
+        rows = []
+        for metric, source in (('maximum_class_probability', max_row),
+                               ('shannon_entropy_nats', entropy_row),
+                               ('normalized_entropy', entropy_row)):
+            scale = np.log(6) if metric == 'normalized_entropy' else 1
+            row = {'metric': metric, 'support': 'BP>0; six FLPs valid and in [0,1]; abs(sum-1)<=1e-6',
+                   'support_pixels': diagnostic.categorical_count,
+                   'bp_positive_excluded': diagnostic.categorical_invalid,
+                   'min': source['min'] / scale, 'max': source['max'] / scale,
+                   'mean': source['mean'] / scale, 'population_std': source['std'] / scale,
+                   'valid_sample_size': source['valid_sample_size']}
+            row.update({f'q{q:02d}': source[f'q{q:02d}'] / scale
+                        for q in (0, 1, 5, 25, 50, 75, 95, 99, 100)})
+            rows.append(row)
+        csv_table('flp_distribution_summary.csv', rows)
+        csv_table('dominant_flp_classes.csv', [
+            {'class': f'FLP{i}', 'pixel_count': int(n),
+             'fraction': int(n) / diagnostic.categorical_count}
+            for i, n in enumerate(diagnostic.class_counts, start=1)
+        ])
     csv_table('distribution_summary.csv', result['summaries'])
     patterns = result['patterns']
     csv_table('mask_overlap.csv', [{
@@ -214,3 +298,4 @@ def write_products(result, root: Path):
     }
     (tables / 'analysis_provenance.json').write_text(json.dumps(provenance, indent=2, sort_keys=True) + '\n')
     plotting.render(result, figures)
+    plotting.render_flp_semantics(result, figures)

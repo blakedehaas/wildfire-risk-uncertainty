@@ -94,7 +94,7 @@ def test_products_deterministic_and_sources_unchanged(tmp_path):
     outputs = {p: p.read_bytes() for p in base.rglob('*') if p.is_file()}
     assert (base / 'tables/distribution_summary.csv') in outputs
     assert (base / 'figures/bp_map.png') in outputs
-    assert len(list((base / 'figures').glob('*.png'))) == 19
+    assert len(list((base / 'figures').glob('*.png'))) == 23
     assert all(p.stat().st_size > 1000 for p in (base / 'figures').glob('*.png'))
     result2 = dillon.analyze(tmp_path, requested=300, window_size=32)
     dillon.write_products(result2, tmp_path)
@@ -102,3 +102,52 @@ def test_products_deterministic_and_sources_unchanged(tmp_path):
     assert before == {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in source_files}
     assert not plt.get_fignums()
     assert plt.get_backend().lower() == 'agg'
+
+
+def test_flp_vector_semantics_and_tolerances():
+    from wildfire_risk_uncertainty.eda.flp_semantics import (
+        FLPDiagnostics,
+        vector_metrics,
+    )
+
+    vectors = np.array([
+        [0, 1, 1 / 6, .2, 1],
+        [0, 0, 1 / 6, .2, 0],
+        [0, 0, 1 / 6, .2, 0],
+        [0, 0, 1 / 6, .2, 0],
+        [0, 0, 1 / 6, .2, 0],
+        [0, 0, 1 / 6, .2, 0],
+    ], dtype=np.float64)
+    sums, deviation, zero, near, classes, entropy = vector_metrics(vectors)
+    np.testing.assert_allclose(sums, [0, 1, 1, 1.2, 1])
+    assert zero.tolist() == [True, False, False, False, False]
+    assert near.tolist() == [False, True, True, False, True]
+    assert classes[0] == 0
+    assert entropy[1] == 0
+    assert entropy[2] == pytest.approx(np.log(6))
+    assert deviation[3] == pytest.approx(.2)
+    diagnostics = FLPDiagnostics()
+    diagnostics.update(vectors, np.array([0, 1, 1, 1, 0]))
+    assert diagnostics.sums.count == 5
+    assert diagnostics.sums.zero == 1
+    assert diagnostics.exact_one == 2
+    assert diagnostics.tolerances.tolist() == [3, 3, 3, 3]
+    assert diagnostics.states.tolist() == [1, 0, 3, 1]
+    assert diagnostics.crosstab.tolist() == [[1, 1, 0], [0, 2, 1]]
+    assert diagnostics.categorical_justified()
+    assert diagnostics.categorical_count == 2
+    assert diagnostics.categorical_invalid == 1
+
+
+def test_nested_tolerances_and_zero_vector():
+    from wildfire_risk_uncertainty.eda.flp_semantics import FLPDiagnostics
+
+    sums = np.array([1, 1 - 5e-7, 1 - 5e-5, 1 - 5e-4, 1 - 5e-3, 0])
+    vectors = np.zeros((6, len(sums)))
+    vectors[0] = sums
+    diagnostics = FLPDiagnostics()
+    diagnostics.update(vectors, np.array([1, 1, 1, 1, 1, 0]))
+    assert diagnostics.tolerances.tolist() == [2, 3, 4, 5]
+    assert diagnostics.states.tolist() == [1, 2, 3, 0]
+    assert diagnostics.categorical_count == 2
+    assert diagnostics.categorical_invalid == 3

@@ -128,3 +128,87 @@ def render(result, directory):
                 ax.text(j, i, f'{result["correlation"][i,j]:.2f}', ha='center', va='center', fontsize=9)
         fig.colorbar(im, ax=ax, label='Sample Pearson r')
         save(fig, directory / 'sample_correlations.png')
+
+
+def render_flp_semantics(result, directory):
+    """Exact streaming histograms and native-lattice spatial diagnostics."""
+    from .flp_semantics import (
+        CATEGORICAL_TOLERANCE,
+        DEVIATION_EDGES,
+        ENTROPY_EDGES,
+        SUM_EDGES,
+        vector_metrics,
+    )
+
+    diag = result['flp_diagnostics']
+    sums = result['flp_sum_sample']
+    bp = result['samples'][0]
+    bounds = result['bounds']
+    rows, cols = result['sample_rows'], result['sample_cols']
+    shape = result['summaries'][0]
+    dx = (bounds[2] - bounds[0]) / shape['width']
+    dy = (bounds[3] - bounds[1]) / shape['height']
+    stride = result['provenance']['sample_stride_pixels']
+    extent = [(bounds[0] + (cols[0] + .5 - stride / 2) * dx) / 1000,
+              (bounds[0] + (cols[-1] + .5 + stride / 2) * dx) / 1000,
+              (bounds[3] - (rows[-1] + .5 + stride / 2) * dy) / 1000,
+              (bounds[3] - (rows[0] + .5 - stride / 2) * dy) / 1000]
+    with plt.rc_context(STYLE):
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        ax.stairs(diag.sum_hist, SUM_EDGES, fill=True)
+        ax.set(yscale='log', xlabel='Sum of six FLPs', ylabel='Pixel count (log)',
+               title='FLP vector sums — full raster')
+        save(fig, directory / 'flp_sum_distribution.png')
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        ax.stairs(diag.deviation_hist[1:], DEVIATION_EDGES[1:], fill=True)
+        ax.set(xscale='log', yscale='log', xlabel='Positive absolute deviation from one',
+               ylabel='Pixel count (log)', title='FLP sum deviation — full raster')
+        ax.text(.03, .95, f'Exact zero deviation: {diag.deviation.zero:,} pixels',
+                transform=ax.transAxes, va='top')
+        save(fig, directory / 'flp_sum_deviation_from_one.png')
+        fig, ax = plt.subplots(figsize=(9, 5))
+        ax.set_facecolor('#e5e5e5')
+        im = ax.imshow(np.ma.masked_invalid(sums), origin='upper', extent=extent,
+                       cmap=plt.get_cmap('viridis').with_extremes(bad='#e5e5e5'),
+                       vmin=0, vmax=max(1, diag.sums.maximum), interpolation='nearest')
+        ax.set(xlabel='EPSG:5070 easting (km)', ylabel='EPSG:5070 northing (km)',
+               title='FLP sum — native-grid lattice')
+        fig.colorbar(im, ax=ax, label='Sum of six FLPs')
+        save(fig, directory / 'flp_sum_map.png')
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        for mask, label in ((bp == 0, 'BP = 0'), (bp > 0, 'BP > 0')):
+            data = sums[mask & np.isfinite(sums)]
+            ax.hist(data, bins=SUM_EDGES, histtype='step', label=f'{label} (n={len(data):,})')
+        ax.set(yscale='log', xlabel='Sum of six FLPs (lattice)', ylabel='Sample count (log)',
+               title='BP zero state versus FLP sum')
+        ax.legend()
+        save(fig, directory / 'bp_zero_vs_flp_sum.png')
+        if diag.categorical_justified():
+            flps = result['samples'][1:].astype(np.float64)
+            valid = np.all(np.isfinite(flps), axis=0)
+            safe = np.where(valid, flps, 0)
+            _, deviation, zero, _, classes, entropy = vector_metrics(safe)
+            support = valid & (bp > 0) & (deviation <= CATEGORICAL_TOLERANCE) & ~zero
+            mapped = ((np.where(support, classes, np.nan), 'dominant_flp_class.png',
+                       'Dominant FLP class', 'FLP class', 1, 6, 'tab10'),
+                      (np.where(support, np.max(safe, axis=0), np.nan),
+                       'maximum_flp_probability.png', 'Maximum FLP probability',
+                       'Probability', 0, 1, 'viridis'),
+                      (np.where(support, entropy, np.nan), 'flp_entropy.png',
+                       'FLP entropy — simulated intensity dispersion', 'Nats', 0,
+                       np.log(6), 'magma'))
+            for data, filename, title, label, low, high, cmap_name in mapped:
+                fig, ax = plt.subplots(figsize=(9, 5))
+                ax.set_facecolor('#e5e5e5')
+                im = ax.imshow(np.ma.masked_invalid(data), origin='upper', extent=extent,
+                               cmap=plt.get_cmap(cmap_name).with_extremes(bad='#e5e5e5'),
+                               vmin=low, vmax=high, interpolation='nearest')
+                ax.set(xlabel='EPSG:5070 easting (km)', ylabel='EPSG:5070 northing (km)',
+                       title=title)
+                fig.colorbar(im, ax=ax, label=label)
+                save(fig, directory / filename)
+            fig, ax = plt.subplots(figsize=(8, 4.5))
+            ax.stairs(diag.entropy_hist, ENTROPY_EDGES, fill=True)
+            ax.set(xlabel='Shannon entropy (nats)', ylabel='Pixel count',
+                   title='Conditional FLP entropy — full raster')
+            save(fig, directory / 'flp_entropy_distribution.png')

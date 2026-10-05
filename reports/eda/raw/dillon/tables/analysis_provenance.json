@@ -3,6 +3,7 @@
   "common_valid_sample_size": 492489,
   "correlation": "Pearson on common-valid spatial lattice; all 7 variables pairwise only",
   "coverage_map": "exact valid proportions in 32x32 native-cell bins; edge bins smaller; disagreement locations enlarged with logarithmic fraction colors",
+  "flp_sum_states": "zero exact; near_one abs(sum-1)<=1e-4; remaining positive below/above; sums in float64 without renormalization",
   "histogram_convention": "left-closed/right-open except final bin includes right edge; exact counts",
   "histogram_exclusions": "linear: below 0/above 1; log: nonpositive/below 1e-12/above 1; counts in summary",
   "linear_histogram_edges": [

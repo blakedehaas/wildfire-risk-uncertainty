@@ -1,0 +1,7 @@
+bp_state,flp_state,pixel_count,state_tolerance
+BP_eq_0,zero,29728314,0.0001
+BP_eq_0,near_one,0,0.0001
+BP_eq_0,other,0,0.0001
+BP_gt_0,zero,2090,0.0001
+BP_gt_0,near_one,81068779,0.0001
+BP_gt_0,other,10537,0.0001

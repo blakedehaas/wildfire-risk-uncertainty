@@ -1,10 +1,8 @@
-# Raw-data EDA — Checkpoints 1 and 2
+# Raw-data EDA — Checkpoints 1, 2, and 3A
 
-This report retains Checkpoint 1 structural discovery and adds **Checkpoint 2
-Dillon statistical/spatial EDA** below. It is not the finished raw-data EDA.
-No WUI value/temporal analysis, FLP-vector validation, entropy, dominant class,
-extreme-event threshold, predictive model, training dataset, or spatial join
-has been implemented or selected.
+This report retains Checkpoint 1 structural discovery and Checkpoint 2
+Dillon statistical/spatial EDA, and adds **Checkpoint 3A FLP-vector semantics**.
+It is not the finished raw-data EDA.
 
 Run from the repository root with the locally extracted sources listed in
 [data/SOURCES.md](../../../data/SOURCES.md):
@@ -281,7 +279,7 @@ relationship with FLP2, and positive relationships with FLP3–6 in this sample.
 Hexbins show strong concentration at small BP and broad/nonlinear spreads;
 correlations do not imply causality, predictive performance, or independent
 observations. All seven-variable pairwise correlations are preserved in the table.
-No sums across the six FLPs, entropy, or dominant classes were calculated.
+At Checkpoint 2, no sums across the six FLPs, entropy, or dominant classes were calculated. Checkpoint 3A below adds vector diagnostics.
 
 ### Canonical tables and figures
 
@@ -330,10 +328,134 @@ of joint support. Source zeros remain valid numeric values; this checkpoint does
 not decide whether all zeros have identical physical meaning. Spatial lattice
 aliasing and decimation limit fine-scale interpretations. Spatial dependence
 precludes treating the sample as independent observations for inference.
-Dillon probability definitions and modeled time periods still need source-metadata
-confirmation before scientific integration. Checkpoint 1's WUI metadata conflicts
+Dillon probability definitions and modeled time context are reviewed against the local source metadata in Checkpoint 3A below. Checkpoint 1's WUI metadata conflicts
 remain unresolved. No WUI values were analyzed.
 
-Stop here for review. FLP-vector semantics/sums, entropy, dominant classes, WUI
-temporal analysis, cross-dataset joining, dataset construction, thresholds, and
-models remain outside this checkpoint.
+Checkpoint 3A below addresses FLP-vector semantics. Other project work remains outside this checkpoint.
+
+## Checkpoint 3A: Dillon FLP probability-distribution semantics
+
+### Authoritative local metadata
+
+The local USDA Forest Service [metadata XML](../../../data/raw/dillon_2023/_metadata_RDS-2016-0034-3.xml)
+(`idinfo/descript/abstract`, `dataqual/logic`, `dataqual/complete`, and the BP/FLP
+file descriptions in `eainfo/overview/eadetc`) and [file index](../../../data/raw/dillon_2023/_fileindex_RDS-2016-0034-3.html)
+are the sources for the following interpretations:
+
+- **BP** is the number of FSim annual iterations in which a pixel burned divided
+  by total annual iterations. Burnable pixels never burned in the finite simulation
+  were assigned nominal BP **0.000008**.
+- **FLP1–FLP6** are conditional proportions of simulated fires burning a cell in
+  six flame-length classes, given that a fire occurs there. Classes are in feet:
+  FLP1 <2, FLP2 2–<4, FLP3 4–<6, FLP4 6–<8, FLP5 8–<12,
+  FLP6 ≥12. The source uses shorthand such as “2 < 4 ft.”; the explicit inclusion
+  of boundary values is not fully specified in the metadata.
+- The metadata says BP-positive cells have a positive FLP total and six FLPs sum
+  to one. BP-zero cells should have zero FLP total and correspond to nonburnable
+  FBFM40 fuels after 270 m resampling. Burnable cells without a simulated burn
+  were assigned zonal mean FLPs from similar pixels, checked and adjusted to sum
+  to one. These are documented rules, tested below rather than presumed exact.
+- `LF2020` refers to circa-2020 static LANDFIRE landscape conditions, with
+  contemporary weather, ignition patterns, and fire management. FSim uses tens
+  of thousands of hypothetical contemporary seasons. Historical 2006–2020
+  records informed weather generation and calibration. The probabilities are
+  neither a 2020 observed burn map nor a dated future forecast.
+
+### Direct empirical results
+
+All figures below use the same bounded-memory native-raster pass as Checkpoint 2.
+Sums are float64 additions of the original six float32 values, without
+renormalization. Validity is all six GDAL-valid and finite FLP cells, **before**
+BP restriction. Interior quantiles come from the existing deterministic lattice;
+min/max and all counts/moments are full coverage.
+
+Across **110,811,995** six-FLP-valid pixels, FLP sum ranges **0 to
+1.0000001909211278**, mean **0.7316834138**, population std **0.4430831083**.
+There are **29,732,679 exact-zero** sums, **81,079,316 positive** sums, and
+**20,028,181 exactly-one** sums. Lattice q25/q50/q75/q95/q99 are respectively
+0, 1, 1.0000000186264515, 1.0000000497093424, and
+1.000000074505806. Thus **not all valid FLP vectors sum to one**.
+
+The absolute deviation from one has full-coverage mean **0.2683166079**, maximum
+**1**, lattice q25 **7.4505805969e-9**, q50 **2.9802322388e-8**, and q75/q95/q99
+**1**. Exact tolerance accounting over all six-FLP-valid pixels is:
+
+| Absolute tolerance | Within count | Fraction |
+| ---: | ---: | ---: |
+| 1e-6 | 81,068,773 | 0.7315884260 |
+| 1e-4 | 81,068,779 | 0.7315884801 |
+| 1e-3 | 81,070,454 | 0.7316035958 |
+| 1e-2 | 81,079,316 | 0.7316835691 |
+
+For descriptive state labels, “near one” means `abs(sum-1) <= 1e-4`:
+**29,732,679 zero**, **10,537 positive below 0.9999**, **81,068,779 near one**,
+and **0 above 1.0001**. These states partition all six-FLP-valid pixels.
+The positive low sums are real supplied vectors, not rounded into the near-one
+category. Small deviations around one are compatible with float32 rounding;
+the low sums and BP-positive zero vectors below are a substantive conflict with
+metadata claims whose cause is unresolved.
+
+On the **110,809,720** BP-and-six-FLP-valid pixels, the exact crosstab is:
+
+| BP | FLP zero | FLP near one (1e-4) | FLP other |
+| --- | ---: | ---: | ---: |
+| BP = 0 | 29,728,314 | 0 | 0 |
+| BP > 0 | 2,090 | 81,068,779 | 10,537 |
+
+Therefore BP-positive/zero-FLP is **2,090**, BP-zero/nonzero-FLP is **0**,
+BP-positive/not-near-one is **12,627**, and BP-zero/near-one is **0**.
+Separately, BP and FLP valid masks differ at **9,786** pixels: **7,511** BP-valid
+with FLPs invalid and **2,275** BP-invalid with all six FLPs valid. The FLP masks
+match each other. The crosstab does not assign a BP state to mask-mismatched cells.
+
+### Conditional categorical interpretation
+
+The metadata supports conditional categorical meaning, and **81,068,773**
+BP-positive cells have all six FLPs valid, each in [0,1], and sum within **1e-6**
+of one. This explicitly defined support is treated as an approximately normalized
+six-class distribution. The **12,633** other BP-positive/common-valid cells are
+excluded: 2,090 zero vectors, 10,537 materially low sums, and six with deviations
+between 1e-6 and 1e-4. No values are renormalized, and zero vectors receive no
+class or entropy. The tolerance leaves tiny departures from exact normalization;
+normalized entropy can consequently exceed one by float32-scale rounding.
+
+Within that support, dominant classes FLP1–FLP6 have respectively **22,045,985**,
+**30,742,739**, **20,358,784**, **2,469,340**, **3,135,895**, and **2,316,030**
+pixels. Ties use the first class in FLP order. Maximum supplied class probability
+has mean **0.6341600** and population std **0.2059668**. Shannon entropy
+`-sum(p log p)`, with `0 log 0 = 0`, has mean **0.7976603 nats**, population std
+**0.4270676**, and range **0 to 1.79175949 nats**. Mean `H/log(6)` is
+**0.4451827**. FLP entropy describes concentration or dispersion of the supplied
+simulated wildfire intensity distribution. It is **not** epistemic uncertainty,
+aleatoric ML uncertainty, predictive uncertainty, or model confidence.
+
+### Products and unresolved questions
+
+New tables: [sum summary](dillon/tables/flp_sum_summary.csv),
+[deviation summary](dillon/tables/flp_sum_deviation_summary.csv),
+[tolerances](dillon/tables/flp_sum_tolerances.csv),
+[states](dillon/tables/flp_sum_states.csv),
+[BP crosstab](dillon/tables/bp_flp_sum_crosstab.csv),
+[categorical summary](dillon/tables/flp_distribution_summary.csv), and
+[dominant-class counts](dillon/tables/dominant_flp_classes.csv).
+
+New figures: [sum distribution](dillon/figures/flp_sum_distribution.png),
+[deviation](dillon/figures/flp_sum_deviation_from_one.png),
+[sum map](dillon/figures/flp_sum_map.png),
+[BP zero comparison](dillon/figures/bp_zero_vs_flp_sum.png),
+[dominant class](dillon/figures/dominant_flp_class.png),
+[maximum probability](dillon/figures/maximum_flp_probability.png),
+[entropy map](dillon/figures/flp_entropy.png), and
+[entropy distribution](dillon/figures/flp_entropy_distribution.png).
+Maps and BP comparison use the deterministic native-grid lattice; histogram counts
+are full coverage. The categorical map gray area includes zero vectors, invalid
+pixels, and excluded nonnormalized vectors.
+
+The source does not explain the 2,090 BP-positive zero vectors or 10,537 materially
+low positive sums, nor identify whether these reflect processing edges, exceptions
+in source fuels, or another cause. The metadata's class-boundary shorthand and
+how conditional FLPs should be interpreted for pixels assigned nominal BP and
+zonal mean FLPs also merit source clarification. The categorical summaries are
+valid descriptive calculations on the stated support, not a claim that all
+burnable cells have normalized vectors or that these probabilities measure
+uncertainty in a fitted prediction model.

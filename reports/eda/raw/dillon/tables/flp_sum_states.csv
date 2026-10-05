@@ -1,0 +1,5 @@
+state,pixel_count,fraction,state_tolerance
+zero,29732679,0.26831643090623897,0.0001
+positive_below_one_minus_tolerance,10537,9.508898382345702e-05,0.0001
+near_one,81068779,0.7315884801099376,0.0001
+above_one_plus_tolerance,0,0.0,0.0001
