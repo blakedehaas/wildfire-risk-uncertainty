@@ -1,0 +1,15 @@
+{
+  "gdal": {
+    "pyogrio": "3.12.4",
+    "rasterio": "3.12.2"
+  },
+  "metadata_sha256": "2edd4696ab151d267bd41a34e3a031d09b936466229617bbc16c6f55e2c0afd1",
+  "packages": {
+    "numpy": "2.5.3",
+    "pyogrio": "0.13.0",
+    "rasterio": "1.5.2"
+  },
+  "sampling": "none; deterministic metadata inventory, no RNG",
+  "scope": "structural inventory only; no pixel or feature reads",
+  "source_guard": "File sizes and mtimes unchanged during inspection (not content hashes)"
+}

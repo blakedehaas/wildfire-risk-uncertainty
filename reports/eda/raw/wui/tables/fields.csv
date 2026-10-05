@@ -1,0 +1,36 @@
+layer,field,dtype,ogr_type,ogr_subtype,schema_years,metadata_label,definition
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,BLK20,object,OFTString,OFSTNone,,BLK20,"A unique number assigned to Census Blocks concatenated from State, County, Tract, and Block, and Water fields from US Census TIGER. The Census Bureau defines a block as the smallest geographic area for which the Bureau of the Census collects and tabulates decennial census data, [and] are formed by streets, roads, railroads, streams and other bodies of water, other visible and cultural features, and the legal boundaries shown on Census Bureau maps (US Census Bureau)."
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,WATER20,int16,OFTInteger,OFSTInt16,,WATER20,Flag if polygon is a water body using 2020 TIGER water bodies (1=water)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,AWATER20PC,float64,OFTReal,OFSTNone,,AWATER20PC,% of block area that is water
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,POP2020,int32,OFTInteger,OFSTNone,2020,POP2020,2020 population
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,HU2020,int32,OFTInteger,OFSTNone,2020,HU2020,2020 total housing units
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,OCCHU2020,int32,OFTInteger,OFSTNone,2020,OCCHU2020,2020 occupied housing units
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,VACHU2020,int32,OFTInteger,OFSTNone,2020,VACHU2020,2020 vacant housing units
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,POPDEN2020,float64,OFTReal,OFSTNone,2020,POPDEN2020,2020 population density (persons / square km)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,HUDEN2020,float64,OFTReal,OFSTNone,2020,HUDEN2020,2020 total housing density (units / square km)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,OCCHUDEN2020,float64,OFTReal,OFSTNone,2020,OCCHUDEN2020,2020 occupied housing density (units / square km)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,VACHUDEN2020,float64,OFTReal,OFSTNone,2020,VACHUDEN2020,2020 vacant housing density (units / square km)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,PUBFLAG,int32,OFTInteger,OFSTNone,,PUBFLAG,Flag if polygon is a protected area (1=public land)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,STATE,object,OFTString,OFSTNone,,STATE,2 letter state abbreviation
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,HU1990,int32,OFTInteger,OFSTNone,1990,HU1990,1990 total housing units (allocated)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,HU2000,int32,OFTInteger,OFSTNone,2000,HU2000,2000 total housing units (allocated)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,HU2010,int32,OFTInteger,OFSTNone,2010,HU2010,2010 total housing units (allocated)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,HUDEN1990,float64,OFTReal,OFSTNone,1990,HUDEN1990,1990 housing density (units / square km)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,HUDEN2000,float64,OFTReal,OFSTNone,2000,HUDEN2000,2000 total housing density (units / square km)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,HUDEN2010,float64,OFTReal,OFSTNone,2010,HUDEN2010,2010 housing density (units / square km)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,VEG1992PC,float64,OFTReal,OFSTNone,1992,VEG1992PC,Wildland Vegetation % in 1992 where wildland vegetation = (forests + grasslands + wetlands)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,VEG2001PC,float64,OFTReal,OFSTNone,2001,VEG2001PC,Wildland Vegetation % in 2001 where wildland vegetation = (forests + grasslands + wetlands)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,VEG2011PC,float64,OFTReal,OFSTNone,2011,VEG2011PC,Wildland Vegetation % in 2011 where wildland vegetation = (forests + grasslands + wetlands)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,VEG2019PC,float64,OFTReal,OFSTNone,2019,VEG2019PC,Wildland Vegetation % in 2019 where wildland vegetation = (forests + grasslands + wetlands)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,WUIFLAG1990,int32,OFTInteger,OFSTNone,1990,WUIFLAG1990,Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 1990
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,WUICLASS1990,object,OFTString,OFSTNone,1990,WUICLASS1990,1990 Wildland Urban Interface class (see enumerated domains for WUICLASS2020)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,WUIFLAG2000,int32,OFTInteger,OFSTNone,2000,WUIFLAG2000,Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 2000
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,WUICLASS2000,object,OFTString,OFSTNone,2000,WUICLASS2000,2000 Wildland Urban Interface class (see enumerated domains for WUICLASS2020)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,WUIFLAG2010,int32,OFTInteger,OFSTNone,2010,WUIFLAG2010,Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 2010
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,WUICLASS2010,object,OFTString,OFSTNone,2010,WUICLASS2010,2010 Wildland Urban Interface class (see enumerated domains for WUICLASS2020)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,WUIFLAG2020,int32,OFTInteger,OFSTNone,2020,WUIFLAG2020,Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 2020
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,WUICLASS2020,object,OFTString,OFSTNone,2020,WUICLASS2020,2010 Wildland Urban Interface class (see enumerated domains)
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,BUFVEG,int16,OFTInteger,OFSTInt16,,BUFVEG,"flag (1=inside, 0=outside) for polygons within potential interface buffers (2.14 km around dense vegetation areas >= 75% wildland vegetation and > 500 hectares in 2020)"
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,fips,object,OFTString,OFSTNone,,FIPS,U.S. County Federal Information Processing Standards (FIPS) code.
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,Shape_Length,float64,OFTReal,OFSTNone,,Shape_Length,Length of feature in internal units.
+CONUS_WUI_block_1990_2020_change_v4_gcs_na83,Shape_Area,float64,OFTReal,OFSTNone,,Shape_Area,Area of feature in internal units squared.

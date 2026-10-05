@@ -1,0 +1,941 @@
+{
+  "attributes": {
+    "AWATER20PC": {
+      "definition": "% of block area that is water",
+      "domains": [],
+      "source": "U.S. Census Bureau",
+      "unenumerated_domain": null
+    },
+    "BLK20": {
+      "definition": "A unique number assigned to Census Blocks concatenated from State, County, Tract, and Block, and Water fields from US Census TIGER. The Census Bureau defines a block as the smallest geographic area for which the Bureau of the Census collects and tabulates decennial census data, [and] are formed by streets, roads, railroads, streams and other bodies of water, other visible and cultural features, and the legal boundaries shown on Census Bureau maps (US Census Bureau).",
+      "domains": [],
+      "source": "U.S. Census Bureau",
+      "unenumerated_domain": null
+    },
+    "BUFVEG": {
+      "definition": "flag (1=inside, 0=outside) for polygons within potential interface buffers (2.14 km around dense vegetation areas >= 75% wildland vegetation and > 500 hectares in 2020)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "FIPS": {
+      "definition": "U.S. County Federal Information Processing Standards (FIPS) code.",
+      "domains": [],
+      "source": "National Institute of Standards and Technology (NIST)",
+      "unenumerated_domain": null
+    },
+    "HU1990": {
+      "definition": "1990 total housing units (allocated)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "HU2000": {
+      "definition": "2000 total housing units (allocated)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "HU2010": {
+      "definition": "2010 total housing units (allocated)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "HU2020": {
+      "definition": "2020 total housing units",
+      "domains": [],
+      "source": "U.S. Census Bureau",
+      "unenumerated_domain": null
+    },
+    "HUDEN1990": {
+      "definition": "1990 housing density (units / square km)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "HUDEN2000": {
+      "definition": "2000 total housing density (units / square km)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "HUDEN2010": {
+      "definition": "2010 housing density (units / square km)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "HUDEN2020": {
+      "definition": "2020 total housing density (units / square km)",
+      "domains": [],
+      "source": "U.S. Census Bureau",
+      "unenumerated_domain": null
+    },
+    "OBJECTID": {
+      "definition": "Internal feature number.",
+      "domains": [],
+      "source": "Esri",
+      "unenumerated_domain": "Sequential unique whole numbers that are automatically generated."
+    },
+    "OCCHU2020": {
+      "definition": "2020 occupied housing units",
+      "domains": [],
+      "source": "U.S. Census Bureau",
+      "unenumerated_domain": null
+    },
+    "OCCHUDEN2020": {
+      "definition": "2020 occupied housing density (units / square km)",
+      "domains": [],
+      "source": "U.S. Census Bureau",
+      "unenumerated_domain": null
+    },
+    "POP2020": {
+      "definition": "2020 population",
+      "domains": [],
+      "source": "U.S. Census Bureau",
+      "unenumerated_domain": null
+    },
+    "POPDEN2020": {
+      "definition": "2020 population density (persons / square km)",
+      "domains": [],
+      "source": "U.S. Census Bureau",
+      "unenumerated_domain": null
+    },
+    "PUBFLAG": {
+      "definition": "Flag if polygon is a protected area (1=public land)",
+      "domains": [],
+      "source": "SILVIS lab",
+      "unenumerated_domain": null
+    },
+    "STATE": {
+      "definition": "2 letter state abbreviation",
+      "domains": [],
+      "source": "SILVIS lab",
+      "unenumerated_domain": null
+    },
+    "Shape": {
+      "definition": "Feature geometry.",
+      "domains": [],
+      "source": "Esri",
+      "unenumerated_domain": "Coordinates defining the features."
+    },
+    "Shape_Area": {
+      "definition": "Area of feature in internal units squared.",
+      "domains": [],
+      "source": "Esri",
+      "unenumerated_domain": "Positive real numbers that are automatically generated."
+    },
+    "Shape_Length": {
+      "definition": "Length of feature in internal units.",
+      "domains": [],
+      "source": "Esri",
+      "unenumerated_domain": "Positive real numbers that are automatically generated."
+    },
+    "VACHU2020": {
+      "definition": "2020 vacant housing units",
+      "domains": [],
+      "source": "U.S. Census Bureau",
+      "unenumerated_domain": null
+    },
+    "VACHUDEN2020": {
+      "definition": "2020 vacant housing density (units / square km)",
+      "domains": [],
+      "source": "U.S. Census Bureau",
+      "unenumerated_domain": null
+    },
+    "VEG1992PC": {
+      "definition": "Wildland Vegetation % in 1992 where wildland vegetation = (forests + grasslands + wetlands)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "VEG2001PC": {
+      "definition": "Wildland Vegetation % in 2001 where wildland vegetation = (forests + grasslands + wetlands)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "VEG2011PC": {
+      "definition": "Wildland Vegetation % in 2011 where wildland vegetation = (forests + grasslands + wetlands)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "VEG2019PC": {
+      "definition": "Wildland Vegetation % in 2019 where wildland vegetation = (forests + grasslands + wetlands)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "WATER20": {
+      "definition": "Flag if polygon is a water body using 2020 TIGER water bodies (1=water)",
+      "domains": [],
+      "source": "U.S. Census Bureau",
+      "unenumerated_domain": null
+    },
+    "WUICLASS1990": {
+      "definition": "1990 Wildland Urban Interface class (see enumerated domains for WUICLASS2020)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "WUICLASS2000": {
+      "definition": "2000 Wildland Urban Interface class (see enumerated domains for WUICLASS2020)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "WUICLASS2010": {
+      "definition": "2010 Wildland Urban Interface class (see enumerated domains for WUICLASS2020)",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "WUICLASS2020": {
+      "definition": "2010 Wildland Urban Interface class (see enumerated domains)",
+      "domains": [
+        {
+          "edomv": "Water",
+          "edomvd": "open water",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "Med_Dens_Interface",
+          "edomvd": "housing density between 49.42108 and 741.3162 and wildland vegetation <= 50% and within 2.414 km of area with >= 75% wildland vegetation",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "High_Dens_Intermix",
+          "edomvd": "housing density >= 741.3162 and wildland vegetation > 50%",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "Low_Dens_Interface",
+          "edomvd": "housing density between 6.177635 and 49.42108 and wildland vegetation <= 50% and within 2.414 km of area with >= 75% wildland vegetation",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "Med_Dens_Intermix",
+          "edomvd": "housing density between 49.42108 and 741.3162 and wildland vegetation > 50%",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "Low_Dens_NoVeg",
+          "edomvd": "housing density between 6.177635 and 49.42108 and wildland vegetation <= 50%",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "Med_Dens_NoVeg",
+          "edomvd": "housing density between 49.42108 and 741.3162 and wildland vegetation <= 50%",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "Uninhabited_NoVeg",
+          "edomvd": "housing density = 0 and wildland vegetation <= 50%",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "Low_Dens_Intermix",
+          "edomvd": "housing density between 6.177635 and 49.42108 and wildland vegetation > 50%",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "High_Dens_Interface",
+          "edomvd": "housing density >= 741.3162 and wildland vegetation <= 50% and within 2.414 km of area with >= 75% wildland vegetation",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "Very_Low_Dens_Veg",
+          "edomvd": "housing density < 6.177635 and wildland vegetation > 50%",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "Uninhabited_Veg",
+          "edomvd": "housing density = 0 and wildland vegetation > 50%",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "Very_Low_Dens_NoVeg",
+          "edomvd": "housing density < 6.177635 and wildland vegetation <= 50%",
+          "edomvds": "silvis"
+        },
+        {
+          "edomv": "High_Dens_NoVeg",
+          "edomvd": "housing density >= 741.3162 and wildland vegetation <= 50%",
+          "edomvds": "silvis"
+        }
+      ],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "WUIFLAG1990": {
+      "definition": "Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 1990",
+      "domains": [],
+      "source": "SILIVS Lab",
+      "unenumerated_domain": null
+    },
+    "WUIFLAG2000": {
+      "definition": "Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 2000",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "WUIFLAG2010": {
+      "definition": "Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 2010",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    },
+    "WUIFLAG2020": {
+      "definition": "Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 2020",
+      "domains": [],
+      "source": "SILVIS Lab",
+      "unenumerated_domain": null
+    }
+  },
+  "documented_bounds": {
+    "eastbc": -65.254885,
+    "northbc": 51.649519,
+    "southbc": 22.76869,
+    "westbc": -127.977107
+  },
+  "process_steps": [
+    "Step 1: Created nationwide map of \"protected areas with no housing units\", pulled from the PAD-US (CBI Edition) version 2.1, including all federal, state, regional, and local government owned lands. Intersected these protected areas with U.S. block level housing change 1990-2020 dataset and moved housing units out of protected areas into neighboring privately owned blocks with the same block ID (called public land adjustment or PLA). If the same block ID had no private areas then houses remained within the protected lands boundary (no adjustment). Corrected topological errors and removed sliver polygons from public-land adjusted housing density dataset.",
+    "Step 2: Integrated U.S. block level housing change 1990-2020 dataset (public land adjusted) with the 2019 National Land Cover Dataset NLCD (years 2001, 2011, and 2019), and the 1992/2001 Retrofit Change Product (1992 values only) using ArcGIS Tabulate Area command. Calculated wildland vegetation % for 4 decades (1990, 2000, 2010, 2020), with wildland vegetation defined as sum of relative percentages of land cover classes for forests, grasslands, and wetlands.",
+    "Step 3: Assigned 1990 Intermix WUI classes to all polygons with > 50% wildland vegetation in 1990 and minimum 6.177635 housing units / square km in 1990. Assigned 2000 Intermix WUI classes to all polygons with > 50% wildland vegetation in 2000 and minimum 6.177635 housing units / square km in 2000. Assigned 2010 Intermix WUI classes to all polygons with > 50% wildland vegetation in 2010 and minimum 6.177635 housing units / square km in 2010. Assigned 2020 Intermix WUI classes to all polygons with > 50% wildland vegetation in 2020 and minimum 6.177635 housing units / square km in 2020.",
+    "Step 4: Selected all block housing polygons with >= 75% wildland vegetation in 2020 and dissolved into larger contiguous areas. Buffered areas > 500 hectares by 2,414 m (1.5 miles) to identify potential interface WUI areas. Unioned 2020 buffers with integrated block housing polygons and assigned Interface WUI classes to all polygons falling inside vegetation buffers and minimum 6.177635 housing units / square km (ignoring pre-existing Intermix WUI areas) for all 4 decades 1990, 2000, 2010, 2020."
+  ],
+  "source": "data/raw/silvis_wui_2020/CONUS_WUI_block_1990_2020_change_v4_metadata.xml",
+  "year_mentions": [
+    {
+      "text": "20230701",
+      "xml_path": "metadata/idinfo/citation/citeinfo/pubdate",
+      "years": [
+        "2023"
+      ]
+    },
+    {
+      "text": "The 1990-2020 wildland-urban interface of the conterminous United States (version 4)- geospatial data",
+      "xml_path": "metadata/idinfo/citation/citeinfo/title",
+      "years": [
+        "1990",
+        "2020"
+      ]
+    },
+    {
+      "text": "The Wildland-Urban Interface (WUI) is the area where houses meet or intermingle with undeveloped wildland vegetation. This makes the WUI a focal area for human-environment conflicts such as wildland fires, habitat fragmentation, invasive species, and biodiversity decline. Using geographic information systems (GIS), we integrated U.S. Census and USGS National Land Cover Data, to map the Federal Register definition of WUI (Federal Register 66:751, 2001). These data are useful within a GIS for mapping and analysis at national, state, and local levels.",
+      "xml_path": "metadata/idinfo/descript/abstract",
+      "years": [
+        "2001"
+      ]
+    },
+    {
+      "text": "To provide a spatially detailed national assessment of the Wildland Urban Interface (WUI) and WUI change between 1990 and 2020 across the coterminous U.S. to support wildland fire research, policy and management, and inquiries into the effects of housing growth on the environment.",
+      "xml_path": "metadata/idinfo/descript/purpose",
+      "years": [
+        "1990",
+        "2020"
+      ]
+    },
+    {
+      "text": "19900101",
+      "xml_path": "metadata/idinfo/timeperd/timeinfo/rngdates/begdate",
+      "years": [
+        "1990"
+      ]
+    },
+    {
+      "text": "20200101",
+      "xml_path": "metadata/idinfo/timeperd/timeinfo/rngdates/enddate",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "1990, 2000, 2010, 2020",
+      "xml_path": "metadata/idinfo/timeperd/current",
+      "years": [
+        "1990",
+        "2000",
+        "2010",
+        "2020"
+      ]
+    },
+    {
+      "text": "PAD-US (CBI Edition) Version 2.1, September 2016",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccite/citeinfo/title",
+      "years": [
+        "2016"
+      ]
+    },
+    {
+      "text": "PAD-US (CBI Edition) Version 2.1, September 2016",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccitea",
+      "years": [
+        "2016"
+      ]
+    },
+    {
+      "text": "Dewitz, J., and U.S. Geological Survey, 2021, National Land Cover Database (NLCD) 2019 Products (ver. 2.0, June 2021): U.S. Geological Survey data release, https://doi.org/10.5066/P9KZCM54",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccite/citeinfo/title",
+      "years": [
+        "2019",
+        "2021"
+      ]
+    },
+    {
+      "text": "Dewitz, J., and U.S. Geological Survey, 2021, National Land Cover Database (NLCD) 2019 Products (ver. 2.0, June 2021): U.S. Geological Survey data release, https://doi.org/10.5066/P9KZCM54",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccitea",
+      "years": [
+        "2019",
+        "2021"
+      ]
+    },
+    {
+      "text": "Multi-Resolution Land Characteristics Consortium (MRLC) National Land Cover Dataset (NLCD) 2019.  NLCD Land Cover (CONUS) All Years.  Product provided landcover information for identifying forest, grassland, and wetland areas (wildland vegetation) for 2000, 2010, 2020 WUI classification.",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccontr",
+      "years": [
+        "2000",
+        "2010",
+        "2019",
+        "2020"
+      ]
+    },
+    {
+      "text": "U.S. Block Housing Change 1990 - 2020",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccite/citeinfo/title",
+      "years": [
+        "1990",
+        "2020"
+      ]
+    },
+    {
+      "text": "Dataset created by SILVIS Lab by allocating 1990, 2000, and 2010 housing units to 2210 TIGER block geography using Block Relationship Files. See metadata for the U.S. Block Housing Change 1990 - 2010 dataset on the SILVIS website for more details.",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccite/citeinfo/othercit",
+      "years": [
+        "1990",
+        "2000",
+        "2010"
+      ]
+    },
+    {
+      "text": "U.S. Block Housing Change 1990 - 2020",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccitea",
+      "years": [
+        "1990",
+        "2020"
+      ]
+    },
+    {
+      "text": "U.S. Census TIGER 2020 block polygons with associated 2020, 2010, 2000, and 1990 housing density. 2020 Census Block housing densities obtained from Summary File 1 and 1990, 2000, 2010 housing densities allocated from Census Bureau 1990-2000, 2000-2010, and 2010-2020 Block Relationship Files.",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccontr",
+      "years": [
+        "1990",
+        "2000",
+        "2010",
+        "2020"
+      ]
+    },
+    {
+      "text": "Fry, J.A., Coan, M.J., Homer, C.G., Meyer, D.K., and Wickham, J.D., 2009, Completion of the National Land Cover Database (NLCD) 1992/2001 Land Cover Change Retrofit product: U.S. Geological Survey Open-File Report 2008 1379, 18 p.",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccite/citeinfo/title",
+      "years": [
+        "1992",
+        "2001",
+        "2008",
+        "2009"
+      ]
+    },
+    {
+      "text": "NLCD Retrofit Change Product 1992-2001",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccitea",
+      "years": [
+        "1992",
+        "2001"
+      ]
+    },
+    {
+      "text": "Multi-Resolution Land Characteristics Consortium (MRLC) National Land Cover Dataset (NLCD) 1992/2001 Retrofit Land Cover Change Product. Provided landcover information for identifying forest, grassland, and wetland areas (wildland vegetation) for 1990 WUI classification.",
+      "xml_path": "metadata/dataqual/lineage/srcinfo/srccontr",
+      "years": [
+        "1990",
+        "1992",
+        "2001"
+      ]
+    },
+    {
+      "text": "Step 1: Created nationwide map of \"protected areas with no housing units\", pulled from the PAD-US (CBI Edition) version 2.1, including all federal, state, regional, and local government owned lands. Intersected these protected areas with U.S. block level housing change 1990-2020 dataset and moved housing units out of protected areas into neighboring privately owned blocks with the same block ID (called public land adjustment or PLA). If the same block ID had no private areas then houses remained within the protected lands boundary (no adjustment). Corrected topological errors and removed sliver polygons from public-land adjusted housing density dataset.",
+      "xml_path": "metadata/dataqual/lineage/procstep/procdesc",
+      "years": [
+        "1990",
+        "2020"
+      ]
+    },
+    {
+      "text": "20230701",
+      "xml_path": "metadata/dataqual/lineage/procstep/procdate",
+      "years": [
+        "2023"
+      ]
+    },
+    {
+      "text": "Step 2: Integrated U.S. block level housing change 1990-2020 dataset (public land adjusted) with the 2019 National Land Cover Dataset NLCD (years 2001, 2011, and 2019), and the 1992/2001 Retrofit Change Product (1992 values only) using ArcGIS Tabulate Area command. Calculated wildland vegetation % for 4 decades (1990, 2000, 2010, 2020), with wildland vegetation defined as sum of relative percentages of land cover classes for forests, grasslands, and wetlands.",
+      "xml_path": "metadata/dataqual/lineage/procstep/procdesc",
+      "years": [
+        "1990",
+        "1992",
+        "2000",
+        "2001",
+        "2010",
+        "2011",
+        "2019",
+        "2020"
+      ]
+    },
+    {
+      "text": "20230701",
+      "xml_path": "metadata/dataqual/lineage/procstep/procdate",
+      "years": [
+        "2023"
+      ]
+    },
+    {
+      "text": "Step 3: Assigned 1990 Intermix WUI classes to all polygons with > 50% wildland vegetation in 1990 and minimum 6.177635 housing units / square km in 1990. Assigned 2000 Intermix WUI classes to all polygons with > 50% wildland vegetation in 2000 and minimum 6.177635 housing units / square km in 2000. Assigned 2010 Intermix WUI classes to all polygons with > 50% wildland vegetation in 2010 and minimum 6.177635 housing units / square km in 2010. Assigned 2020 Intermix WUI classes to all polygons with > 50% wildland vegetation in 2020 and minimum 6.177635 housing units / square km in 2020.",
+      "xml_path": "metadata/dataqual/lineage/procstep/procdesc",
+      "years": [
+        "1990",
+        "2000",
+        "2010",
+        "2020"
+      ]
+    },
+    {
+      "text": "20230701",
+      "xml_path": "metadata/dataqual/lineage/procstep/procdate",
+      "years": [
+        "2023"
+      ]
+    },
+    {
+      "text": "Step 4: Selected all block housing polygons with >= 75% wildland vegetation in 2020 and dissolved into larger contiguous areas. Buffered areas > 500 hectares by 2,414 m (1.5 miles) to identify potential interface WUI areas. Unioned 2020 buffers with integrated block housing polygons and assigned Interface WUI classes to all polygons falling inside vegetation buffers and minimum 6.177635 housing units / square km (ignoring pre-existing Intermix WUI areas) for all 4 decades 1990, 2000, 2010, 2020.",
+      "xml_path": "metadata/dataqual/lineage/procstep/procdesc",
+      "years": [
+        "1990",
+        "2000",
+        "2010",
+        "2020"
+      ]
+    },
+    {
+      "text": "20230701",
+      "xml_path": "metadata/dataqual/lineage/procstep/procdate",
+      "years": [
+        "2023"
+      ]
+    },
+    {
+      "text": "wui_block_1990_2020_change_v4",
+      "xml_path": "metadata/eainfo/detailed/enttyp/enttypl",
+      "years": [
+        "1990",
+        "2020"
+      ]
+    },
+    {
+      "text": "Flag if polygon is a water body using 2020 TIGER water bodies (1=water)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "POP2020",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "2020 population",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "HU2020",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "2020 total housing units",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "OCCHU2020",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "2020 occupied housing units",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "VACHU2020",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "2020 vacant housing units",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "POPDEN2020",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "2020 population density (persons / square km)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "HUDEN2020",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "2020 total housing density (units / square km)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "OCCHUDEN2020",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "2020 occupied housing density (units / square km)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "VACHUDEN2020",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "2020 vacant housing density (units / square km)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "HU1990",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "1990"
+      ]
+    },
+    {
+      "text": "1990 total housing units (allocated)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "1990"
+      ]
+    },
+    {
+      "text": "HUDEN1990",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "1990"
+      ]
+    },
+    {
+      "text": "1990 housing density (units / square km)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "1990"
+      ]
+    },
+    {
+      "text": "HU2000",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2000"
+      ]
+    },
+    {
+      "text": "2000 total housing units (allocated)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2000"
+      ]
+    },
+    {
+      "text": "HUDEN2000",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2000"
+      ]
+    },
+    {
+      "text": "2000 total housing density (units / square km)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2000"
+      ]
+    },
+    {
+      "text": "HU2010",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2010"
+      ]
+    },
+    {
+      "text": "2010 total housing units (allocated)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2010"
+      ]
+    },
+    {
+      "text": "HUDEN2010",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2010"
+      ]
+    },
+    {
+      "text": "2010 housing density (units / square km)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2010"
+      ]
+    },
+    {
+      "text": "VEG1992PC",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "1992"
+      ]
+    },
+    {
+      "text": "Wildland Vegetation % in 1992 where wildland vegetation = (forests + grasslands + wetlands)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "1992"
+      ]
+    },
+    {
+      "text": "VEG2001PC",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2001"
+      ]
+    },
+    {
+      "text": "Wildland Vegetation % in 2001 where wildland vegetation = (forests + grasslands + wetlands)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2001"
+      ]
+    },
+    {
+      "text": "VEG2011PC",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2011"
+      ]
+    },
+    {
+      "text": "Wildland Vegetation % in 2011 where wildland vegetation = (forests + grasslands + wetlands)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2011"
+      ]
+    },
+    {
+      "text": "VEG2019PC",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2019"
+      ]
+    },
+    {
+      "text": "Wildland Vegetation % in 2019 where wildland vegetation = (forests + grasslands + wetlands)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2019"
+      ]
+    },
+    {
+      "text": "WUIFLAG1990",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "1990"
+      ]
+    },
+    {
+      "text": "Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 1990",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "1990"
+      ]
+    },
+    {
+      "text": "WUICLASS1990",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "1990"
+      ]
+    },
+    {
+      "text": "1990 Wildland Urban Interface class (see enumerated domains for WUICLASS2020)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "1990",
+        "2020"
+      ]
+    },
+    {
+      "text": "WUIFLAG2000",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2000"
+      ]
+    },
+    {
+      "text": "Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 2000",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2000"
+      ]
+    },
+    {
+      "text": "WUICLASS2000",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2000"
+      ]
+    },
+    {
+      "text": "2000 Wildland Urban Interface class (see enumerated domains for WUICLASS2020)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2000",
+        "2020"
+      ]
+    },
+    {
+      "text": "WUIFLAG2010",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2010"
+      ]
+    },
+    {
+      "text": "Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 2010",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2010"
+      ]
+    },
+    {
+      "text": "WUICLASS2010",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2010"
+      ]
+    },
+    {
+      "text": "2010 Wildland Urban Interface class (see enumerated domains for WUICLASS2020)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2010",
+        "2020"
+      ]
+    },
+    {
+      "text": "WUIFLAG2020",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "Flag designating WUI (1=intermix; 2=interface) vs. non-WUI (0) areas in 2020",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "WUICLASS2020",
+      "xml_path": "metadata/eainfo/detailed/attr/attrlabl",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "2010 Wildland Urban Interface class (see enumerated domains)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2010"
+      ]
+    },
+    {
+      "text": "flag (1=inside, 0=outside) for polygons within potential interface buffers (2.14 km around dense vegetation areas >= 75% wildland vegetation and > 500 hectares in 2020)",
+      "xml_path": "metadata/eainfo/detailed/attr/attrdef",
+      "years": [
+        "2020"
+      ]
+    },
+    {
+      "text": "20230808",
+      "xml_path": "metadata/metainfo/metd",
+      "years": [
+        "2023"
+      ]
+    },
+    {
+      "text": "FGDC-STD-001-1998",
+      "xml_path": "metadata/metainfo/metstdv",
+      "years": [
+        "1998"
+      ]
+    }
+  ]
+}

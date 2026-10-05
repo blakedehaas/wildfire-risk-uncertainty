@@ -1,0 +1,24 @@
+[
+  {
+    "capabilities": {
+      "fast_feature_count": true,
+      "fast_set_next_by_index": false,
+      "fast_spatial_filter": true,
+      "fast_total_bounds": true,
+      "random_read": true
+    },
+    "crs": "EPSG:4269",
+    "driver": "OpenFileGDB",
+    "features": 9158401,
+    "fid_column": "OBJECTID",
+    "geometry_name": "Shape",
+    "geometry_type": "MultiPolygon",
+    "layer_name": "CONUS_WUI_block_1990_2020_change_v4_gcs_na83",
+    "total_bounds": [
+      -124.84897399999994,
+      24.396308000000033,
+      -66.88544399999995,
+      49.384479000000056
+    ]
+  }
+]

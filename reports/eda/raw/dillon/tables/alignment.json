@@ -1,0 +1,8 @@
+{
+  "bounds": true,
+  "crs": true,
+  "grid": true,
+  "nodata_convention": true,
+  "shape": true,
+  "transform": true
+}

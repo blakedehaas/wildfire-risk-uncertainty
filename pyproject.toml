@@ -4,8 +4,21 @@ version = "0.1.0"
 description = "Research software for probabilistic wildfire risk prediction and uncertainty quantification."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "numpy>=2.5.3",
+    "pyogrio>=0.13.0",
+    "rasterio>=1.5.2",
+]
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[project.scripts]
+wildfire-eda = "wildfire_risk_uncertainty.eda.cli:main"
