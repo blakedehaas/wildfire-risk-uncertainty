@@ -1,0 +1,5 @@
+field,rows_above_100000,median_projected_area_m2,area_below_100_m2,median_count,median_relative_count_per_projected_area_error,count_per_area_within_1pct,water_rows,public_flag_1_rows,public_flag_null_rows
+HUDEN2020,68,9712.00061125571,3,422.5,0.5923544062226974,16,0,0,55
+POPDEN2020,452,10278.034042355943,6,799.0,0.3779197848716207,122,1,0,377
+OCCHUDEN2020,51,9654.938277825428,3,316.0,0.5246970441040368,13,0,0,40
+VACHUDEN2020,3,23536.953720978814,1,15.0,0.9162193394879207,1,0,0,2

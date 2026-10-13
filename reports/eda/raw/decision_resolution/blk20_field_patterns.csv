@@ -1,0 +1,17 @@
+field,pattern,groups
+HU2020,repeated_unchanged,189076
+HU2020,zeroed_public_private_positive,222016
+HU2020,some_pieces_zeroed,497130
+HU2020,varied_nonzero,80794
+POP2020,repeated_unchanged,322162
+POP2020,zeroed_public_private_positive,212225
+POP2020,some_pieces_zeroed,454629
+POP2020,varied_nonzero,0
+OCCHU2020,repeated_unchanged,361182
+OCCHU2020,zeroed_public_private_positive,194640
+OCCHU2020,some_pieces_zeroed,433194
+OCCHU2020,varied_nonzero,0
+VACHU2020,repeated_unchanged,724958
+VACHU2020,zeroed_public_private_positive,96765
+VACHU2020,some_pieces_zeroed,167293
+VACHU2020,varied_nonzero,0

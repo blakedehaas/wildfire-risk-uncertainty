@@ -1,0 +1,20 @@
+field,type,status,reason_or_aggregation
+WUIFLAG2020,categorical,include,polygon-cell category area shares
+WUICLASS2020,categorical,include,polygon-cell category area shares
+WATER20,categorical,include,polygon-cell category area shares
+HUDEN2020,intensive,include,area-weighted raw source values
+POPDEN2020,intensive,include,area-weighted raw source values
+OCCHUDEN2020,intensive,include,area-weighted raw source values
+VACHUDEN2020,intensive,include,area-weighted raw source values
+VEG2019PC,intensive,include,area-weighted raw source values
+AWATER20PC,intensive,include,area-weighted raw source values
+HU2020,extensive,exclude,cell count allocation not established
+POP2020,extensive,exclude,cell count allocation not established
+OCCHU2020,extensive,exclude,cell count allocation not established
+VACHU2020,extensive,exclude,cell count allocation not established
+PUBFLAG,provisional,exclude,adjustment/construction indicators with ambiguous nulls
+BUFVEG,provisional,exclude,adjustment/construction indicators with ambiguous nulls
+BLK20,admin,provenance-only,"source identity, not predictors"
+fips,admin,provenance-only,"source identity, not predictors"
+STATE,admin,provenance-only,"source identity, not predictors"
+OBJECTID/FID,admin,provenance-only,"source identity, not predictors"
