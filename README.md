@@ -15,3 +15,5 @@ The current research phase is reproducible exploratory data analysis of the raw 
 Python dependencies and commands are managed with `uv`.
 
 Large source, extracted, and processed datasets are intentionally excluded from Git. Source provenance is recorded in [`data/SOURCES.md`](data/SOURCES.md).
+
+Canonical dataset pilot construction and validation are documented in [docs/canonical_dataset_pilot.md](docs/canonical_dataset_pilot.md).

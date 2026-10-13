@@ -1,0 +1,248 @@
+{
+  "aggregation": "EPSG:5070 true cell/polygon intersection; categorical area / full cell; intensive finite-area weighted mean",
+  "base_commit": "d519589a43f342d29abf4c223cc9bc5e5f331bf9",
+  "crs": "EPSG:5070",
+  "gdal": "3.12.2",
+  "geometry_repair_policy": "For invalid source geometry, apply shapely.make_valid in EPSG:5070; accept only non-empty Polygon/MultiPolygon with finite positive original and repaired projected areas and relative area change <=1e-6; otherwise mask affected WUI values.",
+  "geos": "3.14.1",
+  "grid": {
+    "cell_area_m2": 72900.0,
+    "height": 11283,
+    "transform": [
+      270.0,
+      0.0,
+      -2362635.000000001,
+      0.0,
+      -270.0,
+      3267674.999999998
+    ],
+    "width": 17372
+  },
+  "lock_sha256": "04702c102abeb378540c7204e3a2867763039f7e8e92a0fb1fcf937b581ab18c",
+  "locked_packages": [
+    {
+      "name": "affine",
+      "version": "3.0.1"
+    },
+    {
+      "name": "attrs",
+      "version": "26.1.0"
+    },
+    {
+      "name": "certifi",
+      "version": "2026.7.22"
+    },
+    {
+      "name": "click",
+      "version": "8.5.0"
+    },
+    {
+      "name": "colorama",
+      "version": "0.4.6"
+    },
+    {
+      "name": "contourpy",
+      "version": "1.4.0"
+    },
+    {
+      "name": "cycler",
+      "version": "0.12.1"
+    },
+    {
+      "name": "fonttools",
+      "version": "4.66.1"
+    },
+    {
+      "name": "iniconfig",
+      "version": "2.3.0"
+    },
+    {
+      "name": "kiwisolver",
+      "version": "1.5.1"
+    },
+    {
+      "name": "matplotlib",
+      "version": "3.11.2"
+    },
+    {
+      "name": "numpy",
+      "version": "2.5.3"
+    },
+    {
+      "name": "packaging",
+      "version": "26.3"
+    },
+    {
+      "name": "pillow",
+      "version": "12.3.0"
+    },
+    {
+      "name": "pluggy",
+      "version": "1.6.0"
+    },
+    {
+      "name": "pyarrow",
+      "version": "23.0.1"
+    },
+    {
+      "name": "pygments",
+      "version": "2.21.0"
+    },
+    {
+      "name": "pyogrio",
+      "version": "0.13.0"
+    },
+    {
+      "name": "pyparsing",
+      "version": "3.3.3"
+    },
+    {
+      "name": "pyproj",
+      "version": "3.8.0"
+    },
+    {
+      "name": "pytest",
+      "version": "9.1.1"
+    },
+    {
+      "name": "python-dateutil",
+      "version": "2.9.0.post0"
+    },
+    {
+      "name": "rasterio",
+      "version": "1.5.2"
+    },
+    {
+      "name": "ruff",
+      "version": "0.16.10"
+    },
+    {
+      "name": "shapely",
+      "version": "2.2.0"
+    },
+    {
+      "name": "six",
+      "version": "1.17.0"
+    },
+    {
+      "name": "tqdm",
+      "version": "4.70.1"
+    },
+    {
+      "name": "wildfire-risk-uncertainty",
+      "version": "0.1.0"
+    }
+  ],
+  "packages": {
+    "numpy": "2.5.3",
+    "pyarrow": "23.0.1",
+    "pyogrio": "0.13.0",
+    "pyproj": "3.8.0",
+    "rasterio": "1.5.2",
+    "shapely": "2.2.0",
+    "tqdm": "4.70.1"
+  },
+  "partitions": [
+    {
+      "name": "row_00999_col_01491_h008_w008.parquet",
+      "sha256": "111af7c5ad4d5b5c8834e8dbd27ccac1b7a6084047c2d5cabf152e049b2a3da8"
+    },
+    {
+      "name": "row_03411_col_00158_h008_w008.parquet",
+      "sha256": "6a390fb63feaaf9bc6e0063878aacf428186baedcf4952151a1dbb3c0c91b2b6"
+    },
+    {
+      "name": "row_04215_col_11319_h008_w008.parquet",
+      "sha256": "8a7d17b4077934a0c33f73c3a491f5053b6ee346e0cbe1c4758d86e785e5cb00"
+    },
+    {
+      "name": "row_04218_col_11297_h008_w008.parquet",
+      "sha256": "fd07296620781f8cfc7bdba8e64bf405008360329ac2ebd6b09db300506cf7ca"
+    },
+    {
+      "name": "row_05056_col_05894_h064_w064.parquet",
+      "sha256": "b5f1fc38b6c613b2df5dc7ea51d81e4b3e8c835d1eb280404b7f3c2e849180be"
+    },
+    {
+      "name": "row_05717_col_07786_h008_w008.parquet",
+      "sha256": "39a36b43fd63358306bbc51ccbd05041f8e154fec7f1e02cfe90f37cf35e23ef"
+    }
+  ],
+  "pilot_windows": [
+    {
+      "column": 1491,
+      "height": 8,
+      "name": "row_00999_col_01491_h008_w008",
+      "row": 999,
+      "width": 8
+    },
+    {
+      "column": 158,
+      "height": 8,
+      "name": "row_03411_col_00158_h008_w008",
+      "row": 3411,
+      "width": 8
+    },
+    {
+      "column": 11319,
+      "height": 8,
+      "name": "row_04215_col_11319_h008_w008",
+      "row": 4215,
+      "width": 8
+    },
+    {
+      "column": 11297,
+      "height": 8,
+      "name": "row_04218_col_11297_h008_w008",
+      "row": 4218,
+      "width": 8
+    },
+    {
+      "column": 5894,
+      "height": 64,
+      "name": "row_05056_col_05894_h064_w064",
+      "row": 5056,
+      "width": 64
+    },
+    {
+      "column": 7786,
+      "height": 8,
+      "name": "row_05717_col_07786_h008_w008",
+      "row": 5717,
+      "width": 8
+    }
+  ],
+  "proj": "9.8.1",
+  "python": "3.12.14",
+  "row_order": "ascending cell_id within ascending tile order",
+  "schema_version": "1.1.0",
+  "seed": 42,
+  "source_sha256": {
+    "dillon_archive": "b5313ad0ca2deac11b1284472731cc0aedea1bd3f0e92823e0d5356cb6dfff73",
+    "silvis_archive": "0b3d1bfabd80fdc75a3e776c26f8708ac5a55ab43b7f87b081d69e413fe447d4",
+    "silvis_metadata": "2edd4696ab151d267bd41a34e3a031d09b936466229617bbc16c6f55e2c0afd1"
+  },
+  "source_versions": {
+    "dillon": "RDS-2016-0034-3 LF2020",
+    "silvis": "CONUS WUI V4 2020; vegetation 2019"
+  },
+  "target_mask_rule": "BP>0 and all FLPs GDAL-valid, finite, in [0,1], and abs(float64 sum-1)<=1e-6",
+  "tolerances": {
+    "area_fraction": 1e-06,
+    "area_m2": 0.07289999999999999,
+    "flp_sum": 1e-06,
+    "geometry_repair_relative_area_change": 1e-06,
+    "share": 1e-06
+  },
+  "topology_policy": "Positive overlap, duplicate source coverage, coverage excess, and categorical-share error <=1e-6 of cell area are tolerated and reported; material discrepancies mask affected WUI values; no renormalization.",
+  "writer": {
+    "compression": "zstd",
+    "compression_level": 3,
+    "data_page_version": "1.0",
+    "format": "Parquet",
+    "row_group_size": 65536,
+    "store_schema": true,
+    "use_dictionary": false,
+    "write_statistics": false
+  }
+}

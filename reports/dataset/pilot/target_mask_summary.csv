@@ -1,0 +1,8 @@
+mask,count
+bp_valid,4359
+flps_present,4359
+flp_in_range,4359
+flp_target_valid,406
+flp_missing_invalid,0
+flp_present_non_normalized,0
+flp_not_applicable_bp_zero,3953

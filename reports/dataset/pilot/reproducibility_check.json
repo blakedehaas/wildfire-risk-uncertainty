@@ -1,0 +1,28 @@
+{
+  "parquet_hashes_match": true,
+  "parquet_sha256": {
+    "row_00999_col_01491_h008_w008.parquet": "111af7c5ad4d5b5c8834e8dbd27ccac1b7a6084047c2d5cabf152e049b2a3da8",
+    "row_03411_col_00158_h008_w008.parquet": "6a390fb63feaaf9bc6e0063878aacf428186baedcf4952151a1dbb3c0c91b2b6",
+    "row_04215_col_11319_h008_w008.parquet": "8a7d17b4077934a0c33f73c3a491f5053b6ee346e0cbe1c4758d86e785e5cb00",
+    "row_04218_col_11297_h008_w008.parquet": "fd07296620781f8cfc7bdba8e64bf405008360329ac2ebd6b09db300506cf7ca",
+    "row_05056_col_05894_h064_w064.parquet": "b5f1fc38b6c613b2df5dc7ea51d81e4b3e8c835d1eb280404b7f3c2e849180be",
+    "row_05717_col_07786_h008_w008.parquet": "39a36b43fd63358306bbc51ccbd05041f8e154fec7f1e02cfe90f37cf35e23ef"
+  },
+  "partition_names_match": true,
+  "report_hashes_match": true,
+  "report_names_match": true,
+  "report_sha256": {
+    "coverage_summary.csv": "b6900b1598245ea3db9e7d8be4be1842a27ba48b09ff256bfd34933079c3e5a3",
+    "geometry_repair_summary.csv": "a167555e600c3eb9314951f4ad7ff3c4debd2f63d3197810a4170f16ae96137c",
+    "manifest.json": "a964a3dbeeff173f46dcf1c78d210bf752f4a4c063bc62f08a44aa812d4c7c0b",
+    "null_summary.csv": "b14d43635062d88cc85df0aed0d35da7df0fa4e35b17dcae2c89c12cc2887bab",
+    "pilot_summary.csv": "195f27936f7c480d3c75418c64bccf4be7e9236617f9ede077a0ed43e5361b8d",
+    "schema.json": "6be4626e604d0c1ef6e31446227b0f80f531b381df3c3572763fbdc45f97e74f",
+    "target_mask_summary.csv": "f2ab41280ef339b2ee908f982ba0dc11d88dbde2ebdd44cdd82defcf22d3cbe2",
+    "tolerated_topology_summary.csv": "22d20dcc09c04ee6dd5dae6ecdad9a4814fdffd0bdcb2fb38c4b22898bb333ef",
+    "topology_summary.csv": "468fada53a5ea27faf976bc883c0d46b160c0b88e08774f303b58859bb16ef4c",
+    "validation_summary.json": "5cac456ba79b3cc609c4372b42e25f4cec9ea3df8a206d2ee91b6c20072fb86b"
+  },
+  "runs": 2,
+  "seed": 42
+}

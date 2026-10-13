@@ -7,8 +7,12 @@ requires-python = ">=3.12"
 dependencies = [
     "matplotlib>=3.11.2",
     "numpy>=2.5.3",
+    "pyarrow>=23,<24",
     "pyogrio>=0.13.0",
+    "pyproj>=3.7,<4",
     "rasterio>=1.5.2",
+    "shapely>=2.1,<3",
+    "tqdm>=4.67,<5",
 ]
 
 [build-system]
@@ -23,3 +27,5 @@ dev = [
 
 [project.scripts]
 wildfire-eda = "wildfire_risk_uncertainty.eda.cli:main"
+wildfire-create-dataset = "wildfire_risk_uncertainty.dataset.create_dataset:main"
+wildfire-validate-pilot = "wildfire_risk_uncertainty.dataset.validate_pilot:main"

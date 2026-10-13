@@ -1,0 +1,13 @@
+{
+  "OCCHUDEN2020_source_null_cells": 415,
+  "POPDEN2020_source_null_cells": 415,
+  "VACHUDEN2020_source_null_cells": 415,
+  "accepted_repairs": 5,
+  "bp_zero": 3953,
+  "flp_valid": 406,
+  "partial_coverage": 5,
+  "rejected_repairs": 0,
+  "repaired_cells": 44,
+  "rows": 4359,
+  "tolerated_overlap_cells": 446
+}
