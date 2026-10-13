@@ -1,8 +1,8 @@
-# Raw-data EDA — Checkpoints 1, 2, 3A, and 3B
+# Raw-data EDA — Checkpoints 1, 2, 3A, 3B, and 3C
 
 This report retains Checkpoint 1 structural discovery and Checkpoint 2
 Dillon statistical/spatial EDA, and adds **Checkpoint 3A FLP-vector semantics** and **Checkpoint 3B SILVIS WUI
-value and temporal EDA**. It is not the finished raw-data EDA.
+value and temporal EDA**, followed by **Checkpoint 3C cross-dataset compatibility and final raw-EDA synthesis**.
 
 Run from the repository root with the locally extracted sources listed in
 [data/SOURCES.md](../../../data/SOURCES.md):
@@ -11,6 +11,7 @@ Run from the repository root with the locally extracted sources listed in
 uv sync --locked
 uv run wildfire-eda raw
 uv run wildfire-eda wui
+uv run wildfire-eda cross-dataset
 uv run pytest
 uv run ruff check .
 ```
@@ -20,18 +21,16 @@ Checkpoint 1 inventory and Checkpoint 2 Dillon products. `uv run wildfire-eda
 dillon` regenerates Dillon analysis alone, without requiring WUI sources.
 `wildfire-eda wui` regenerates Checkpoint 3B without a Dillon scan.
 `raw --root /path/to/repository` supports invocation from another directory.
-The command regenerates canonical JSON/CSV tables and PNG figures, not this
+`wildfire-eda cross-dataset` regenerates Checkpoint 3C from reviewed inventories and bounded WUI geometry batches. The commands regenerate canonical JSON/CSV tables and PNG figures, not this
 interpretive README. It fails on missing required sources. Tests require those local sources;
 no data download occurs. Dependencies are locked in `uv.lock`; library and GDAL
 versions and the XML checksum are recorded in [inventory_run.json](inventory_run.json).
 The structural inventory uses no sampling; Checkpoint 2 sampling is documented
-below. Canonical outputs omit run timestamps and absolute paths. Statistics and
-plotting modules now implement Dillon analysis; cross-dataset analysis remains deferred.
+below. Canonical outputs omit run timestamps and absolute paths. Statistics and plotting modules implement Dillon, WUI, and cross-dataset diagnostics; no spatial join is implemented.
 
 `reports/eda/raw/` holds intentionally committed scientific products.
 `artifacts/eda/raw/` exists locally for disposable/large output and remains ignored.
-Empty figure directories and cross-dataset tables are retained with `.gitkeep`;
-Dillon figures now exist; WUI figures and cross-dataset results remain deferred.
+Checkpoint 3C tables and figures are committed under `cross_dataset/`.
 
 ## Checkpoint 1: empirical Dillon inventory
 
@@ -617,3 +616,149 @@ Figures: [WUIFLAG proportions](wui/figures/wuiflag_composition.png),
 [housing changes](wui/figures/housing_changes.png),
 [vegetation levels](wui/figures/vegetation_longitudinal.png), and
 [2020 spatial sample](wui/figures/wui2020_spatial_sample.png).
+
+
+## Checkpoint 3C: cross-dataset compatibility and final raw-EDA synthesis
+
+### Geography, representation, and scale
+
+Dillon is an EPSG:5070 raster, 17,372 columns by 11,283 rows with 270 × 270 m
+cells (72,900 m²). Its affine transform is `(270, 0, -2362635.000000001,
+0, -270, 3267674.999999998)` and its envelope is
+`(-2362635.000000001, 221264.99999999814, 2327804.999999999,
+3267674.999999998)` metres. The BP valid support contains **110,817,231**
+cells; **110,809,720** cells are common-valid across BP and all FLPs, out of
+**196,008,276** grid cells. Valid support is not the rectangular grid envelope.
+
+The WUI layer contains **9,158,401 MultiPolygon feature rows** in geographic
+EPSG:4269. Its empirical longitude/latitude bounds are
+`(-124.84897399999994, 24.396308000000033, -66.88544399999995,
+49.384479000000056)` degrees. Transforming that *rectangular extent* with
+128 perimeter densification points gives an EPSG:5070 envelope of approximately
+`(-2,922,547, 152,126, 2,948,609, 3,256,288)` m. The bounding-box
+intersection with Dillon is approximately `(-2,362,635, 221,265, 2,327,805,
+3,256,288)` m. WUI's transformed extent envelope stretches roughly **560 km
+west**, **621 km east**, and **69 km south** of Dillon's envelope, while its
+northern edge is about **11 km south** of Dillon's. This comparison is of
+bounding rectangles, not transformed WUI feature coverage. **Bounding-box
+overlap does not imply identical valid-data support**; neither WUI gaps nor WUI
+coverage of individual Dillon valid cells was measured. See the
+[spatial table](cross_dataset/tables/spatial_compatibility.json) and
+[extent figure](cross_dataset/figures/dillon_wui_extent_comparison.png).
+
+A deterministic, evenly spaced sample of **10,000 FIDs** from the WUI feature
+range was read in batches of at most **250 geometries**. Each MultiPolygon ring
+was projected from EPSG:4269 to EPSG:5070; exterior shoelace areas minus hole
+areas form the polygon's physical planar area. Stored `Shape_Area` was not used.
+No sampled geometry was null. The sample is by feature row, not by land area,
+and sparse FID sampling may miss rare geometry types or patterns. It does not
+estimate a national WUI area share.
+
+The sample median area is **37,096 m²** (0.509 Dillon cells), with equivalent
+square side **193 m** and equivalent circle radius **109 m**. Area/cell ratios
+at q5/q25/q50/q75/q95/q99 are approximately **0.036 / 0.168 / 0.509 /
+4.162 / 44.997 / 147.400**. **5,987 (59.87%)** sampled polygons are smaller
+than one Dillon cell; **4,013 (40.13%)** are larger. The wide distribution
+and frequent subcell polygons mean one-polygon/one-cell assignment would lose
+important geometry. These are polygon areas, not intersection areas with
+Dillon cells. See the [scale table](cross_dataset/tables/sampled_polygon_scale_summary.csv)
+and [distribution](cross_dataset/figures/sampled_wui_polygon_scale_distribution.png).
+
+### Temporal and association implications
+
+Dillon LF2020 represents circa-2020 landscape conditions used in hypothetical
+contemporary fire seasons. WUI and housing snapshots are 1990, 2000, 2010,
+and 2020; vegetation snapshots are 1992, 2001, 2011, and 2019. The most
+defensible initial pairing is **2020 WUI/housing/population fields with 2019
+vegetation**. This is approximate alignment, not exact simultaneity or a claim
+that Dillon BP is observed 2020 burning. The WUI interface methodology also
+uses 2020 vegetation buffers across decades, as recorded in Checkpoint 1.
+See the [temporal table](cross_dataset/tables/temporal_compatibility.csv).
+
+The [join comparison](cross_dataset/tables/join_strategy_comparison.csv)
+assesses three candidates without implementing them. **A, cell-center
+point-in-polygon**, is deterministic only with explicit treatment of overlapping
+polygons and ties. It is relatively simple, but boundaries shift abruptly,
+small polygons can disappear, and copying a polygon's HU or POP total into
+one or more cells is not conservative. **B, rasterization**, can be tiled and
+deterministic with fixed row order, `all_touched`, and merge rules. Simple
+last-value burning loses mixtures; default center behavior misses some small
+polygons, while `all_touched` can exaggerate their occupied area. Fractional
+rasterization can approximate coverage, but requires explicit accumulation.
+**C, polygon/cell area-overlap aggregation**, retains subcell contributions
+and can describe mixed cells; it costs more and needs a spatial index, tiles,
+geometry-quality policy, overlap resolution, and fixed numerical rules.
+Duplicate `BLK20` values are not a valid tie breaker for any approach.
+
+For **categorical** WUIFLAG/WUICLASS and WATER20, category-specific intersection
+area shares are the most informative 270-m representation; a dominant class
+could be derived later. PUBFLAG/BUFVEG need null and definition resolution
+first. For **intensive** densities and vegetation/water percentages, an
+intersection-area-weighted mean over observed covered area is defensible,
+accompanied by a coverage fraction and missingness accounting; neither a
+plain sum nor a copied center value is a cell average. For **extensive/count**
+HU/POP/OCCHU/VACHU, fractional allocation by polygon/cell intersection area
+could conserve source totals only after repeated-ID/count-payload semantics
+and overlapping source geometries are audited. `BLK20`, `fips`, and `STATE`
+should be retained for lineage or grouping, not ordinary predictors. None of
+these association choices has been implemented or approved.
+
+### Target support and predictor implications
+
+**BP** is the burn-probability target. **BP=0** common-valid cells have zero
+FLP vectors in the reviewed crosstab. Conditional flame-length probabilities
+have a separate support: BP-positive cells with all six FLPs valid, in [0,1],
+and approximately normalized. At the 1e-6 diagnostic tolerance, that support
+contains **81,068,773** cells. At the 1e-4 zero/near-one descriptive pattern,
+**12,627** BP-positive/common-valid cells fall outside the expected pattern:
+2,090 zero vectors and 10,537 materially low nonzero sums. Separately,
+**9,786** cells have BP/FLP validity-mask disagreement. This checkpoint neither
+renormalizes FLPs nor chooses a cleaning policy. Later `create_dataset.py`
+must decide whether BP training uses all BP-valid cells or a common mask;
+whether conditional FLP training excludes, flags, or investigates the 12,627
+anomalies; whether the stricter 1e-6 versus 1e-4 tolerance governs acceptance;
+and how mask-mismatched cells enter each target-specific sample.
+
+The [field implications](cross_dataset/tables/dataset_design_implications.csv)
+classify candidate variables without freezing features. WUIFLAG2020 and
+WUICLASS2020 are plausible categorical predictors, but partly encode the
+same WUI state and source housing/vegetation logic. HU2020/HUDEN2020 and
+POP2020/POPDEN2020 are plausible housing/population covariates with possible
+count-density redundancy. OCCHU2020/VACHU2020 and their densities add
+occupancy/vacancy detail but can overlap HU signals. VEG2019PC is a plausible
+near-period vegetation covariate. WATER20 and AWATER20PC offer categorical
+and percent water representations that may be redundant; water coverage also
+needs careful handling near burnable support. PUBFLAG and BUFVEG are provisional:
+null meanings are unknown, and BUFVEG metadata conflicts between 2.14 and
+2.414 km. `BLK20`, `fips`, and `STATE` are provenance/admin fields, not ordinary
+predictors. The **989,016 duplicated BLK20 IDs**, extreme density tails, and
+**933,788 missing values each** in POPDEN2020, OCCHUDEN2020, and VACHUDEN2020
+require policy before feature construction. These problems are inherited from
+Checkpoint 3B and have not been resolved by spatial sampling.
+
+Material design consequences are separate target masks, explicit geometry
+coverage fractions, variable-specific aggregation, source-row/block identity
+reconciliation, and documented missingness and temporal lag. The reports are
+raw EDA only; no canonical dataset, split, spatial join, or model was created.
+
+### Decision-ready recommendation
+
+For future `create_dataset.py`, use the Dillon EPSG:5070 270-m grid as the
+analysis support. Pair 2020 WUI/housing/population fields with VEG2019PC. The
+best-supported spatial design is tiled polygon/cell area-overlap aggregation:
+store categorical area shares plus coverage, area-weight intensive fields over
+valid covered area, and allocate extensive counts conservatively only after
+auditing repeated BLK20 count payloads and overlapping polygons. Preserve an
+ID crosswalk for provenance. Construct BP and conditional FLP target supports
+separately, using the reviewed masks and an explicit anomaly policy. This is a
+recommendation for a later checkpoint, **not an implemented or final approved
+feature set**.
+
+**Human decisions still required:** approve the association design and
+categorical share versus dominant-class representation; define treatment of
+uncovered cells, source polygon overlaps, slivers/invalid geometry, and
+multiple geometries per cell; resolve repeated BLK20 count semantics before
+any count allocation; approve density-tail/missingness and PUBFLAG/BUFVEG null
+rules, including the BUFVEG distance conflict; select nonredundant predictors;
+and approve target-specific mask, FLP anomaly, and normalization-tolerance
+policies. Future split design also requires a separate decision.

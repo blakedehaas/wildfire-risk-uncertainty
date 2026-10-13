@@ -1,0 +1,19 @@
+field,variable_type,status,association
+WUIFLAG2020,categorical,plausible initial predictor; check redundancy and support,area fractions / explicit category shares
+WUICLASS2020,categorical,plausible initial predictor; check redundancy and support,area fractions / explicit category shares
+WATER20,categorical,plausible initial predictor; check redundancy and support,area fractions / explicit category shares
+PUBFLAG,categorical,semantic/null resolution before use,area fractions / explicit category shares
+BUFVEG,categorical,semantic/null resolution before use,area fractions / explicit category shares
+HUDEN2020,intensive,clean extreme/missing density values,intersection-area weighted mean
+POPDEN2020,intensive,clean extreme/missing density values,intersection-area weighted mean
+OCCHUDEN2020,intensive,clean extreme/missing density values,intersection-area weighted mean
+VACHUDEN2020,intensive,clean extreme/missing density values,intersection-area weighted mean
+VEG2019PC,intensive,plausible initial predictor; check redundancy and support,intersection-area weighted mean
+AWATER20PC,intensive,plausible initial predictor; check redundancy and support,intersection-area weighted mean
+HU2020,extensive/count,plausible initial predictor; check redundancy and support,conservative fractional allocation after repeated-ID audit
+POP2020,extensive/count,plausible initial predictor; check redundancy and support,conservative fractional allocation after repeated-ID audit
+OCCHU2020,extensive/count,plausible initial predictor; check redundancy and support,conservative fractional allocation after repeated-ID audit
+VACHU2020,extensive/count,plausible initial predictor; check redundancy and support,conservative fractional allocation after repeated-ID audit
+BLK20,identifier/admin,"identifier/admin; retain for provenance, not ordinary predictor",crosswalk only
+fips,identifier/admin,"identifier/admin; retain for provenance, not ordinary predictor",crosswalk only
+STATE,identifier/admin,"identifier/admin; retain for provenance, not ordinary predictor",crosswalk only

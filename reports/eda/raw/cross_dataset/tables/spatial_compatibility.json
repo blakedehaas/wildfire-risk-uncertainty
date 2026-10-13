@@ -1,0 +1,46 @@
+{
+  "bbox_overlap_5070_m": [
+    -2362635.000000001,
+    221264.99999999814,
+    2327804.999999999,
+    3256288.271031145
+  ],
+  "bbox_overlap_area_m2": 14235594551375.332,
+  "dillon_bounds_m": [
+    -2362635.000000001,
+    221264.99999999814,
+    2327804.999999999,
+    3267674.999999998
+  ],
+  "dillon_cell_area_m2": 72900,
+  "dillon_common_valid_cells": 110809720,
+  "dillon_crs": "EPSG:5070",
+  "dillon_height_cells": 11283,
+  "dillon_transform": [
+    270.0,
+    0.0,
+    -2362635.000000001,
+    0.0,
+    -270.0,
+    3267674.999999998
+  ],
+  "dillon_valid_bp_cells": 110817231,
+  "dillon_width_cells": 17372,
+  "extent_transform": "rasterio.warp.transform_bounds; 128 densification points per edge; transformed rectangular extent envelope, not feature union",
+  "support_caveat": "Bounding-box overlap does not imply identical valid-data support.",
+  "wui_bounds_degrees": [
+    -124.84897399999994,
+    24.396308000000033,
+    -66.88544399999995,
+    49.384479000000056
+  ],
+  "wui_crs": "EPSG:4269",
+  "wui_extent_bounds_5070_m": [
+    -2922547.496383279,
+    152125.72914016186,
+    2948609.2784367236,
+    3256288.271031145
+  ],
+  "wui_feature_rows": 9158401,
+  "wui_geometry_type": "MultiPolygon"
+}

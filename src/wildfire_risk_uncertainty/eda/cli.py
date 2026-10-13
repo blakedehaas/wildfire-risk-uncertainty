@@ -10,7 +10,7 @@ from pathlib import Path
 import pyogrio
 import rasterio
 
-from . import dillon, wui, wui_values
+from . import cross_dataset, dillon, wui, wui_values
 
 
 def output_paths(root: Path) -> dict[str, Path]:
@@ -106,6 +106,17 @@ def run_wui(root: Path) -> None:
         raise RuntimeError('WUI source package changed during analysis')
     print('WUI empirical products written to reports/eda/raw/wui.')
 
+def run_cross_dataset(root: Path) -> None:
+    root = root.resolve()
+    before = source_state(root)
+    with rasterio.Env(GDAL_PAM_ENABLED="NO", GDAL_CACHEMAX=64 * 1024 * 1024):
+        result = cross_dataset.analyze(root)
+        cross_dataset.write_products(result, root)
+    if source_state(root) != before:
+        raise RuntimeError("Source package changed during cross-dataset analysis")
+    print('Cross-dataset products written to reports/eda/raw/cross_dataset.')
+
+
 def run_raw(root: Path) -> None:
     before = source_state(root)
     run_inventory(root)
@@ -116,7 +127,7 @@ def run_raw(root: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["raw", "dillon", "wui"], help="Source inventory + Dillon EDA, or a Dillon/WUI-specific pass")
+    parser.add_argument("command", choices=["raw", "dillon", "wui", "cross-dataset"], help="Source inventory + Dillon EDA, or a Dillon/WUI-specific pass")
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="Repository root (default: cwd)")
     args = parser.parse_args()
-    {"raw": run_raw, "dillon": run_dillon, "wui": run_wui}[args.command](args.root)
+    {"raw": run_raw, "dillon": run_dillon, "wui": run_wui, "cross-dataset": run_cross_dataset}[args.command](args.root)
