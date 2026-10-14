@@ -1,0 +1,11 @@
+metric,value
+failure_rows,3
+max_coverage_excess_m2,0.1169628234783886
+max_duplicate_overlap_m2,0.15262457224889658
+max_pair_overlap_m2,0.1526245656255666
+max_share_error,6.661338147750939e-16
+tolerated_overlap_cells,5160366
+tolerated_overlap_pairs,6369369
+tolerated_rows,7384634
+reason:material_coverage_excess,3
+reason:material_polygon_overlap,3

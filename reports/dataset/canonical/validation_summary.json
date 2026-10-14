@@ -1,0 +1,103 @@
+{
+  "categorical_source_null_area_fraction_sums": {
+    "WATER20": 0.0,
+    "WUICLASS2020": 0.0,
+    "WUIFLAG2020": 0.0
+  },
+  "dataset_bytes": 4365211176,
+  "geometry_repairs": {
+    "accepted": 24195,
+    "reason:accepted": 24195,
+    "rejected": 0,
+    "unique_accepted_source_ids": 17281,
+    "unique_rejected_source_ids": 0
+  },
+  "hashes_match_manifest": true,
+  "intensive_nulls": {
+    "AWATER20PC": {
+      "null_value_rows": 11812,
+      "source_null_area_cells": 0,
+      "source_null_area_fraction_sum": 0.0,
+      "valid_area_fraction_sum": 110795517.87724775
+    },
+    "HUDEN2020": {
+      "null_value_rows": 11812,
+      "source_null_area_cells": 0,
+      "source_null_area_fraction_sum": 0.0,
+      "valid_area_fraction_sum": 110795517.87724775
+    },
+    "OCCHUDEN2020": {
+      "null_value_rows": 4616150,
+      "source_null_area_cells": 10835403,
+      "source_null_area_fraction_sum": 5853007.491886326,
+      "valid_area_fraction_sum": 104942510.38536122
+    },
+    "POPDEN2020": {
+      "null_value_rows": 4616150,
+      "source_null_area_cells": 10835403,
+      "source_null_area_fraction_sum": 5853007.491886326,
+      "valid_area_fraction_sum": 104942510.38536122
+    },
+    "VACHUDEN2020": {
+      "null_value_rows": 4616150,
+      "source_null_area_cells": 10835403,
+      "source_null_area_fraction_sum": 5853007.491886326,
+      "valid_area_fraction_sum": 104942510.38536122
+    },
+    "VEG2019PC": {
+      "null_value_rows": 11812,
+      "source_null_area_cells": 0,
+      "source_null_area_fraction_sum": 0.0,
+      "valid_area_fraction_sum": 110795517.87724775
+    }
+  },
+  "maxima": {
+    "categorical_share_error": 7.771561172376096e-16,
+    "coverage_fraction": 1.0000009221578114,
+    "intensive_area_error": 7.771561172376096e-16
+  },
+  "partition_count": 3060,
+  "pilot_comparison": {
+    "rows_match": 4359,
+    "window_rows": {
+      "row_00999_col_01491_h008_w008": 64,
+      "row_03411_col_00158_h008_w008": 7,
+      "row_04215_col_11319_h008_w008": 64,
+      "row_04218_col_11297_h008_w008": 64,
+      "row_05056_col_05894_h064_w064": 4096,
+      "row_05717_col_07786_h008_w008": 64
+    },
+    "windows_match": 6
+  },
+  "target_counts": {
+    "bp_positive": 81081424,
+    "bp_zero": 29735807,
+    "flp_in_range": 110809720,
+    "flp_missing_invalid": 18,
+    "flp_not_applicable_bp_zero": 29735807,
+    "flp_present_non_normalized": 12633,
+    "flp_target_valid": 81068773,
+    "flps_present": 110809720,
+    "partially_covered": 36315,
+    "repaired_cells": 3996345,
+    "rows": 110817231,
+    "tolerated_overlap_cells_from_rows": 5160366,
+    "uncovered": 11809,
+    "wui_failures": 3
+  },
+  "tile_count": 3060,
+  "topology": {
+    "failure_rows": 3,
+    "max_coverage_excess_m2": 0.1169628234783886,
+    "max_duplicate_overlap_m2": 0.15262457224889658,
+    "max_pair_overlap_m2": 0.1526245656255666,
+    "max_share_error": 6.661338147750939e-16,
+    "tolerated_overlap_cells": 5160366,
+    "tolerated_overlap_pairs": 6369369,
+    "tolerated_rows": 7384634
+  },
+  "topology_reasons": {
+    "material_coverage_excess": 3,
+    "material_polygon_overlap": 3
+  }
+}

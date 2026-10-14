@@ -1,0 +1,6 @@
+metric,count
+accepted,24195
+reason:accepted,24195
+rejected,0
+unique_accepted_source_ids,17281
+unique_rejected_source_ids,0

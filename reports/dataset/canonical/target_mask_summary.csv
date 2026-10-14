@@ -1,0 +1,9 @@
+mask,count
+rows,110817231
+bp_zero,29735807
+bp_positive,81081424
+flps_present,110809720
+flp_target_valid,81068773
+flp_missing_invalid,18
+flp_present_non_normalized,12633
+flp_not_applicable_bp_zero,29735807

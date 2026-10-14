@@ -1,0 +1,11 @@
+{
+  "accepted_repairs": 24195,
+  "canonical_rows": 110817231,
+  "dataset_bytes": 4365211176,
+  "partition_count": 3060,
+  "rejected_repairs": 0,
+  "tile_count": 3060,
+  "tolerated_overlap_cells": 5160366,
+  "tolerated_overlap_pairs": 6369369,
+  "wui_failure_rows": 3
+}

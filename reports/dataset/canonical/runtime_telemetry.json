@@ -1,0 +1,11 @@
+{
+  "average_rows_per_second": 5562.441598425251,
+  "average_tiles_per_second": 0.15359589061723863,
+  "canonical_rows": 110817231,
+  "dataset_bytes": 4365211176,
+  "partition_count": 3060,
+  "peak_resident_bytes": 3644534784,
+  "peak_resident_kib": 3559116,
+  "tile_count": 3060,
+  "wall_clock_seconds": 19922.408
+}

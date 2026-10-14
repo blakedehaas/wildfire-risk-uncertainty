@@ -1,0 +1,635 @@
+{
+  "columns": [
+    {
+      "aggregation_rule": "row * 17372 + column",
+      "dtype": "int64",
+      "name": "cell_id",
+      "null_semantics": "never null",
+      "role": "provenance",
+      "source": "Dillon grid",
+      "units": null
+    },
+    {
+      "aggregation_rule": "raster row",
+      "dtype": "int32",
+      "name": "row",
+      "null_semantics": "never null",
+      "role": "provenance",
+      "source": "Dillon grid",
+      "units": "native grid index"
+    },
+    {
+      "aggregation_rule": "raster column",
+      "dtype": "int32",
+      "name": "column",
+      "null_semantics": "never null",
+      "role": "provenance",
+      "source": "Dillon grid",
+      "units": "native grid index"
+    },
+    {
+      "aggregation_rule": "native pixel center",
+      "dtype": "float64",
+      "name": "x_5070",
+      "null_semantics": "never null",
+      "role": "provenance",
+      "source": "Dillon grid",
+      "units": "m"
+    },
+    {
+      "aggregation_rule": "native pixel center",
+      "dtype": "float64",
+      "name": "y_5070",
+      "null_semantics": "never null",
+      "role": "provenance",
+      "source": "Dillon grid",
+      "units": "m"
+    },
+    {
+      "aggregation_rule": "constant EPSG:5070/270m",
+      "dtype": "string",
+      "name": "grid_id",
+      "null_semantics": "never null",
+      "role": "provenance",
+      "source": "Dillon LF2020",
+      "units": null
+    },
+    {
+      "aggregation_rule": "constant source GDB identity",
+      "dtype": "string",
+      "name": "wui_source_id",
+      "null_semantics": "never null",
+      "role": "provenance",
+      "source": "SILVIS V4",
+      "units": null
+    },
+    {
+      "aggregation_rule": "native raster value, no resampling",
+      "dtype": "float32",
+      "name": "BP",
+      "null_semantics": "null iff GDAL invalid or nonfinite; BP-invalid row excluded",
+      "role": "target",
+      "source": "Dillon BP",
+      "units": "probability"
+    },
+    {
+      "aggregation_rule": "native raster value, no resampling",
+      "dtype": "float32",
+      "name": "FLP1",
+      "null_semantics": "null iff GDAL invalid or nonfinite; BP-invalid row excluded",
+      "role": "target",
+      "source": "Dillon FLP1",
+      "units": "probability"
+    },
+    {
+      "aggregation_rule": "native raster value, no resampling",
+      "dtype": "float32",
+      "name": "FLP2",
+      "null_semantics": "null iff GDAL invalid or nonfinite; BP-invalid row excluded",
+      "role": "target",
+      "source": "Dillon FLP2",
+      "units": "probability"
+    },
+    {
+      "aggregation_rule": "native raster value, no resampling",
+      "dtype": "float32",
+      "name": "FLP3",
+      "null_semantics": "null iff GDAL invalid or nonfinite; BP-invalid row excluded",
+      "role": "target",
+      "source": "Dillon FLP3",
+      "units": "probability"
+    },
+    {
+      "aggregation_rule": "native raster value, no resampling",
+      "dtype": "float32",
+      "name": "FLP4",
+      "null_semantics": "null iff GDAL invalid or nonfinite; BP-invalid row excluded",
+      "role": "target",
+      "source": "Dillon FLP4",
+      "units": "probability"
+    },
+    {
+      "aggregation_rule": "native raster value, no resampling",
+      "dtype": "float32",
+      "name": "FLP5",
+      "null_semantics": "null iff GDAL invalid or nonfinite; BP-invalid row excluded",
+      "role": "target",
+      "source": "Dillon FLP5",
+      "units": "probability"
+    },
+    {
+      "aggregation_rule": "native raster value, no resampling",
+      "dtype": "float32",
+      "name": "FLP6",
+      "null_semantics": "null iff GDAL invalid or nonfinite; BP-invalid row excluded",
+      "role": "target",
+      "source": "Dillon FLP6",
+      "units": "probability"
+    },
+    {
+      "aggregation_rule": "strict target-mask rule in manifest",
+      "dtype": "bool",
+      "name": "bp_valid",
+      "null_semantics": "flp_sum null when any FLP absent; other diagnostics never null",
+      "role": "diagnostic",
+      "source": "Dillon BP/FLP1-6",
+      "units": null
+    },
+    {
+      "aggregation_rule": "strict target-mask rule in manifest",
+      "dtype": "bool",
+      "name": "flps_present",
+      "null_semantics": "flp_sum null when any FLP absent; other diagnostics never null",
+      "role": "diagnostic",
+      "source": "Dillon BP/FLP1-6",
+      "units": null
+    },
+    {
+      "aggregation_rule": "strict target-mask rule in manifest",
+      "dtype": "float64",
+      "name": "flp_sum",
+      "null_semantics": "flp_sum null when any FLP absent; other diagnostics never null",
+      "role": "diagnostic",
+      "source": "Dillon BP/FLP1-6",
+      "units": "probability"
+    },
+    {
+      "aggregation_rule": "strict target-mask rule in manifest",
+      "dtype": "bool",
+      "name": "flp_in_range",
+      "null_semantics": "flp_sum null when any FLP absent; other diagnostics never null",
+      "role": "diagnostic",
+      "source": "Dillon BP/FLP1-6",
+      "units": null
+    },
+    {
+      "aggregation_rule": "strict target-mask rule in manifest",
+      "dtype": "bool",
+      "name": "flp_target_valid",
+      "null_semantics": "flp_sum null when any FLP absent; other diagnostics never null",
+      "role": "diagnostic",
+      "source": "Dillon BP/FLP1-6",
+      "units": null
+    },
+    {
+      "aggregation_rule": "strict target-mask rule in manifest",
+      "dtype": "bool",
+      "name": "flp_missing_invalid",
+      "null_semantics": "flp_sum null when any FLP absent; other diagnostics never null",
+      "role": "diagnostic",
+      "source": "Dillon BP/FLP1-6",
+      "units": null
+    },
+    {
+      "aggregation_rule": "strict target-mask rule in manifest",
+      "dtype": "bool",
+      "name": "flp_present_non_normalized",
+      "null_semantics": "flp_sum null when any FLP absent; other diagnostics never null",
+      "role": "diagnostic",
+      "source": "Dillon BP/FLP1-6",
+      "units": null
+    },
+    {
+      "aggregation_rule": "strict target-mask rule in manifest",
+      "dtype": "bool",
+      "name": "flp_not_applicable_bp_zero",
+      "null_semantics": "flp_sum null when any FLP absent; other diagnostics never null",
+      "role": "diagnostic",
+      "source": "Dillon BP/FLP1-6",
+      "units": null
+    },
+    {
+      "aggregation_rule": "sum polygon/cell intersection area / 72900",
+      "dtype": "float64",
+      "name": "wui_covered_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category 0 / 72900",
+      "dtype": "float64",
+      "name": "WUIFLAG2020__share__0",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUIFLAG2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category 1 / 72900",
+      "dtype": "float64",
+      "name": "WUIFLAG2020__share__1",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUIFLAG2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category 2 / 72900",
+      "dtype": "float64",
+      "name": "WUIFLAG2020__share__2",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUIFLAG2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "source-null intersection area / 72900",
+      "dtype": "float64",
+      "name": "WUIFLAG2020__source_null_share",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 WUIFLAG2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "1 - WUI covered fraction",
+      "dtype": "float64",
+      "name": "WUIFLAG2020__uncovered_share",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 WUIFLAG2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category High_Dens_Interface / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__High_Dens_Interface",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category High_Dens_Intermix / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__High_Dens_Intermix",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category High_Dens_NoVeg / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__High_Dens_NoVeg",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category Low_Dens_Interface / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__Low_Dens_Interface",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category Low_Dens_Intermix / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__Low_Dens_Intermix",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category Low_Dens_NoVeg / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__Low_Dens_NoVeg",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category Med_Dens_Interface / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__Med_Dens_Interface",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category Med_Dens_Intermix / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__Med_Dens_Intermix",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category Med_Dens_NoVeg / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__Med_Dens_NoVeg",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category Uninhabited_NoVeg / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__Uninhabited_NoVeg",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category Uninhabited_Veg / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__Uninhabited_Veg",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category Very_Low_Dens_NoVeg / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__Very_Low_Dens_NoVeg",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category Very_Low_Dens_Veg / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__Very_Low_Dens_Veg",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category Water / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__share__Water",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "source-null intersection area / 72900",
+      "dtype": "float64",
+      "name": "WUICLASS2020__source_null_share",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "1 - WUI covered fraction",
+      "dtype": "float64",
+      "name": "WUICLASS2020__uncovered_share",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 WUICLASS2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category 0 / 72900",
+      "dtype": "float64",
+      "name": "WATER20__share__0",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WATER20",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "intersection area with category 1 / 72900",
+      "dtype": "float64",
+      "name": "WATER20__share__1",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "predictor",
+      "source": "SILVIS V4 WATER20",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "source-null intersection area / 72900",
+      "dtype": "float64",
+      "name": "WATER20__source_null_share",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 WATER20",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "1 - WUI covered fraction",
+      "dtype": "float64",
+      "name": "WATER20__uncovered_share",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 WATER20",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "sum(intersection area * finite value) / finite-value intersection area",
+      "dtype": "float64",
+      "name": "HUDEN2020",
+      "null_semantics": "null when valid area zero or WUI failure",
+      "role": "predictor",
+      "source": "SILVIS V4 HUDEN2020",
+      "units": "source density units"
+    },
+    {
+      "aggregation_rule": "finite-value area / 72900",
+      "dtype": "float64",
+      "name": "HUDEN2020__valid_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 HUDEN2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "source-null area / 72900",
+      "dtype": "float64",
+      "name": "HUDEN2020__source_null_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 HUDEN2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "sum(intersection area * finite value) / finite-value intersection area",
+      "dtype": "float64",
+      "name": "POPDEN2020",
+      "null_semantics": "null when valid area zero or WUI failure",
+      "role": "predictor",
+      "source": "SILVIS V4 POPDEN2020",
+      "units": "source density units"
+    },
+    {
+      "aggregation_rule": "finite-value area / 72900",
+      "dtype": "float64",
+      "name": "POPDEN2020__valid_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 POPDEN2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "source-null area / 72900",
+      "dtype": "float64",
+      "name": "POPDEN2020__source_null_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 POPDEN2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "sum(intersection area * finite value) / finite-value intersection area",
+      "dtype": "float64",
+      "name": "OCCHUDEN2020",
+      "null_semantics": "null when valid area zero or WUI failure",
+      "role": "predictor",
+      "source": "SILVIS V4 OCCHUDEN2020",
+      "units": "source density units"
+    },
+    {
+      "aggregation_rule": "finite-value area / 72900",
+      "dtype": "float64",
+      "name": "OCCHUDEN2020__valid_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 OCCHUDEN2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "source-null area / 72900",
+      "dtype": "float64",
+      "name": "OCCHUDEN2020__source_null_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 OCCHUDEN2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "sum(intersection area * finite value) / finite-value intersection area",
+      "dtype": "float64",
+      "name": "VACHUDEN2020",
+      "null_semantics": "null when valid area zero or WUI failure",
+      "role": "predictor",
+      "source": "SILVIS V4 VACHUDEN2020",
+      "units": "source density units"
+    },
+    {
+      "aggregation_rule": "finite-value area / 72900",
+      "dtype": "float64",
+      "name": "VACHUDEN2020__valid_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 VACHUDEN2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "source-null area / 72900",
+      "dtype": "float64",
+      "name": "VACHUDEN2020__source_null_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 VACHUDEN2020",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "sum(intersection area * finite value) / finite-value intersection area",
+      "dtype": "float64",
+      "name": "VEG2019PC",
+      "null_semantics": "null when valid area zero or WUI failure",
+      "role": "predictor",
+      "source": "SILVIS V4 VEG2019PC",
+      "units": "percent"
+    },
+    {
+      "aggregation_rule": "finite-value area / 72900",
+      "dtype": "float64",
+      "name": "VEG2019PC__valid_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 VEG2019PC",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "source-null area / 72900",
+      "dtype": "float64",
+      "name": "VEG2019PC__source_null_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 VEG2019PC",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "sum(intersection area * finite value) / finite-value intersection area",
+      "dtype": "float64",
+      "name": "AWATER20PC",
+      "null_semantics": "null when valid area zero or WUI failure",
+      "role": "predictor",
+      "source": "SILVIS V4 AWATER20PC",
+      "units": "percent"
+    },
+    {
+      "aggregation_rule": "finite-value area / 72900",
+      "dtype": "float64",
+      "name": "AWATER20PC__valid_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 AWATER20PC",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "source-null area / 72900",
+      "dtype": "float64",
+      "name": "AWATER20PC__source_null_area_fraction",
+      "null_semantics": "null on WUI geometry/topology failure",
+      "role": "diagnostic",
+      "source": "SILVIS V4 AWATER20PC",
+      "units": "cell area fraction"
+    },
+    {
+      "aggregation_rule": "any geometry/topology failure",
+      "dtype": "bool",
+      "name": "wui_failure",
+      "null_semantics": "never null",
+      "role": "diagnostic",
+      "source": "overlay diagnostics",
+      "units": null
+    },
+    {
+      "aggregation_rule": "sorted JSON source-ID list",
+      "dtype": "string",
+      "name": "wui_failure_source_ids",
+      "null_semantics": "never null; [] if no failure",
+      "role": "diagnostic",
+      "source": "SILVIS OBJECTID",
+      "units": null
+    },
+    {
+      "aggregation_rule": "sorted JSON IDs of accepted make_valid geometries contributing to cell",
+      "dtype": "string",
+      "name": "wui_repaired_source_ids",
+      "null_semantics": "never null; [] if none",
+      "role": "diagnostic",
+      "source": "SILVIS OBJECTID",
+      "units": null
+    },
+    {
+      "aggregation_rule": "sorted JSON IDs in positive overlaps within 1e-6 cell-area tolerance",
+      "dtype": "string",
+      "name": "wui_tolerated_overlap_source_ids",
+      "null_semantics": "never null; [] if none",
+      "role": "diagnostic",
+      "source": "SILVIS OBJECTID",
+      "units": null
+    }
+  ],
+  "schema_version": "1.1.0"
+}

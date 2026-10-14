@@ -1,0 +1,4 @@
+metric,count,fraction_of_rows
+wui_failures,3,2.7071602249292803e-08
+uncovered,11809,0.0001065628503206329
+partially_covered,36315,0.00032770174522768936
