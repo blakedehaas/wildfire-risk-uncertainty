@@ -1,0 +1,3 @@
+# Methodology evidence
+
+The [Checkpoint 5A spatial-dependence method](checkpoint_05a_spatial_dependence.md) records the HITL-accepted Run 2 conclusion, analysis conventions, and decisions deferred to future human review. The [evidence ledger](methodology_evidence_ledger.csv) connects each decision to what the cited work actually did and to this repository's implementation, with completed analysis marked `VALIDATED` and future design decisions marked `FUTURE_HITL`. The empirical outputs live in [the Checkpoint 5A report](../../reports/spatial_dependence/05a/README.md); Run 1 remains there as a superseded diagnostic.

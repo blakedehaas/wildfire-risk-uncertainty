@@ -1,0 +1,20 @@
+{
+  "seed": 42,
+  "pythonhashseed": "42",
+  "sample_supports": {
+    "bp": 110817231,
+    "conditional": 81068773,
+    "unconditional": 110804580
+  },
+  "selected_status": {
+    "bp": "RESOLVED",
+    "flp1": "RANGE_UNRESOLVED",
+    "flp2": "RESOLVED",
+    "flp3": "RANGE_UNRESOLVED",
+    "flp4": "RANGE_UNRESOLVED",
+    "flp5": "RANGE_UNRESOLVED",
+    "flp6": "RANGE_UNRESOLVED",
+    "conditional_flep8": "RANGE_UNRESOLVED",
+    "unconditional_flep8": "RESOLVED"
+  }
+}

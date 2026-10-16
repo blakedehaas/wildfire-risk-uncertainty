@@ -1,0 +1,3 @@
+# Preserve generated CSV bytes while treating CRLF as a valid line ending.
+reports/spatial_dependence/05a/tables/*.csv whitespace=cr-at-eol
+reports/spatial_dependence/05a/run1_full_extent/tables/*.csv whitespace=cr-at-eol

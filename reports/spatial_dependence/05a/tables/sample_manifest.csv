@@ -1,0 +1,4 @@
+population,support_size,sample_size,seed,path,sha256
+bp,110817231,5000,42,samples/bp.parquet,e2a3580930ff24122843a5659b71f18b75cbc44294998efdf9c4aef25529ea34
+conditional,81068773,5000,42,samples/conditional.parquet,697fcde354361d6a04a635e8851f16ddde06410e889fc2e38b117772e843f5eb
+unconditional,110804580,5000,42,samples/unconditional.parquet,f30e4350cbef3c07a40eba8f74727a8c0f7c63158fda8617904f5e1ed1a8387e
