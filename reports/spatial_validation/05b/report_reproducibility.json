@@ -1,0 +1,20 @@
+{
+  "compact_report_files_regenerated_hash_equal": 13,
+  "compact_report_paths": [
+    "README.md",
+    "figures/fold_1_status.png",
+    "figures/fold_2_status.png",
+    "figures/fold_3_status.png",
+    "figures/fold_4_status.png",
+    "figures/fold_5_status.png",
+    "figures/nearest_training_distance_distribution.png",
+    "figures/outer_folds.png",
+    "tables/artifact_hashes.csv",
+    "tables/fold_centroids.csv",
+    "tables/fold_summary.csv",
+    "tables/nearest_training_distance_summary.csv",
+    "tables/target_summary_by_fold.csv"
+  ],
+  "peak_rss_kb": 4185868,
+  "seconds": 21.33296860900009
+}

@@ -12,6 +12,8 @@ dependencies = [
     "pyproj>=3.7,<4",
     "rasterio>=1.5.2",
     "scikit-gstat>=1.0.24",
+    "scikit-learn>=1.9,<2",
+    "scipy>=1.16,<2",
     "shapely>=2.1,<3",
     "tqdm>=4.67,<5",
 ]
@@ -31,3 +33,7 @@ wildfire-eda = "wildfire_risk_uncertainty.eda.cli:main"
 wildfire-create-dataset = "wildfire_risk_uncertainty.dataset.create_dataset:main"
 wildfire-validate-pilot = "wildfire_risk_uncertainty.dataset.validate_pilot:main"
 wildfire-spatial-dependence = "wildfire_risk_uncertainty.spatial_validation.cli:main"
+wildfire-spatial-folds = "wildfire_risk_uncertainty.spatial_validation.outer_cli:main"
+wildfire-validate-folds = "wildfire_risk_uncertainty.spatial_validation.validate_folds:main"
+wildfire-reproduce-folds = "wildfire_risk_uncertainty.spatial_validation.reproduce_folds:main"
+wildfire-reproduce-fold-reports = "wildfire_risk_uncertainty.spatial_validation.reproduce_reports:main"
