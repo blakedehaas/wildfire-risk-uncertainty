@@ -1,0 +1,1 @@
+{"bf16_supported":true,"cuda_runtime":"13.0","device_capability":[12,0],"git_sha":"f0cfa1753988e221d456c161aa8650b1de69a014","gpu_name":"NVIDIA GeForce RTX 5080","gpu_query":"NVIDIA GeForce RTX 5080, 16303 MiB, 610.88","numpy_version":"2.5.3","pyarrow_version":"23.0.1","python_version":"3.12.14","torch_version":"2.13.0+cu130","vram_bytes":17094475776}

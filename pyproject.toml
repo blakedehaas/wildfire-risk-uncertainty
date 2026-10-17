@@ -16,7 +16,16 @@ dependencies = [
     "scipy>=1.16,<2",
     "shapely>=2.1,<3",
     "tqdm>=4.67,<5",
+    "torch==2.13.0",
 ]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
@@ -37,3 +46,4 @@ wildfire-spatial-folds = "wildfire_risk_uncertainty.spatial_validation.outer_cli
 wildfire-validate-folds = "wildfire_risk_uncertainty.spatial_validation.validate_folds:main"
 wildfire-reproduce-folds = "wildfire_risk_uncertainty.spatial_validation.reproduce_folds:main"
 wildfire-reproduce-fold-reports = "wildfire_risk_uncertainty.spatial_validation.reproduce_reports:main"
+wildfire-training-benchmark = "wildfire_risk_uncertainty.benchmark.cli:main"

@@ -1,0 +1,27 @@
+scenario,trials,gpu_seconds,gpu_hours,local_one_gpu_hours,assumption,scope,trials_per_outer_study,outer_studies,total_planned_trials
+five_fold_1_epoch_milestone,1,122.72242081020221,0.03408956133616728,0.03408956133616728,80/20 planning approximation; cumulative resource,,,,
+five_fold_4_epoch_milestone,1,490.88968324080884,0.13635824534466912,0.13635824534466912,80/20 planning approximation; cumulative resource,,,,
+five_fold_16_epoch_milestone,1,1963.5587329632353,0.5454329813786765,0.5454329813786765,80/20 planning approximation; cumulative resource,,,,
+five_fold_64_epoch_milestone,1,7854.234931852941,2.181731925514706,2.181731925514706,80/20 planning approximation; cumulative resource,,,,
+five_fold_100_epoch_milestone,1,12272.24208102022,3.408956133616728,3.408956133616728,80/20 planning approximation; cumulative resource,,,,
+train_1m_rows,1,0.31724119943221474,8.812255539783743e-05,8.812255539783743e-05,measured rate extrapolation,,,,
+validate_1m_rows,1,0.27433106350796543,7.620307319665707e-05,7.620307319665707e-05,measured rate extrapolation,,,,
+full_outer_train_epoch,1,25.22692437200749,0.007007478992224302,0.007007478992224302,measured rate extrapolation,,,,
+inner_train_80pct_epoch,1,20.181539497605993,0.005605983193779442,0.005605983193779442,80/20 planning approximation,,,,
+inner_validate_20pct,1,4.362944664434447,0.0012119290734540129,0.0012119290734540129,80/20 planning approximation,,,,
+no_pruning,20,245444.84162040442,68.17912267233456,68.17912267233456,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",per_outer_study,20,1,20
+no_pruning,100,1227224.208102022,340.8956133616728,340.8956133616728,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",complete_nested_hpo,20,5,100
+idealized_ASHA_rf4,20,8322.114161191837,2.3116983781088436,2.3116983781088436,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",per_outer_study,20,1,20
+idealized_ASHA_rf4,100,41610.570805959185,11.558491890544218,11.558491890544218,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",complete_nested_hpo,20,5,100
+no_pruning,30,368167.26243060664,102.26868400850185,102.26868400850185,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",per_outer_study,30,1,30
+no_pruning,150,1840836.3121530332,511.34342004250925,511.34342004250925,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",complete_nested_hpo,30,5,150
+idealized_ASHA_rf4,30,12483.171241787755,3.4675475671632654,3.4675475671632654,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",per_outer_study,30,1,30
+idealized_ASHA_rf4,150,62415.85620893878,17.337737835816327,17.337737835816327,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",complete_nested_hpo,30,5,150
+no_pruning,50,613612.104051011,170.4478066808364,170.4478066808364,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",per_outer_study,50,1,50
+no_pruning,250,3068060.5202550553,852.239033404182,852.239033404182,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",complete_nested_hpo,50,5,250
+idealized_ASHA_rf4,50,20805.285402979593,5.779245945272109,5.779245945272109,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",per_outer_study,50,1,50
+idealized_ASHA_rf4,250,104026.42701489796,28.896229726360545,28.896229726360545,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",complete_nested_hpo,50,5,250
+no_pruning,100,1227224.208102022,340.8956133616728,340.8956133616728,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",per_outer_study,100,1,100
+no_pruning,500,6136121.040510111,1704.478066808364,1704.478066808364,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",complete_nested_hpo,100,5,500
+idealized_ASHA_rf4,100,41610.570805959185,11.558491890544218,11.558491890544218,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",per_outer_study,100,1,100
+idealized_ASHA_rf4,500,208052.8540297959,57.79245945272109,57.79245945272109,"five inner folds per trial; ASHA expected fractions at 1/4/16/64, cap 100; 80/20 approximation",complete_nested_hpo,100,5,500
