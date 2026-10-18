@@ -66,6 +66,27 @@ def nearest_centroid(coords: np.ndarray, centroids: np.ndarray) -> np.ndarray:
     return np.argmin(squared, axis=1).astype(np.uint8) + 1
 
 
+def uniform_positions(total: int, sample_size: int, seed: int = SEED) -> np.ndarray:
+    """Exact uniform sample of ordered population ranks without replacement."""
+    if not 0 < sample_size <= total:
+        raise ValueError("Invalid fitting sample size")
+    return np.sort(np.asarray(random.Random(seed).sample(range(total), sample_size), dtype=np.int64))
+
+
+def fit_coordinate_sample(sample: np.ndarray, seed: int = SEED) -> np.ndarray:
+    """Reuse the accepted 5B shuffled MiniBatchKMeans fitting configuration."""
+    xy = np.asarray(sample, dtype=np.float64)
+    if xy.ndim != 2 or xy.shape[1] != 2:
+        raise ValueError("Clustering accepts only x_5070 and y_5070")
+    rng = np.random.default_rng(seed)
+    shuffled = xy[rng.permutation(len(xy))]
+    model = MiniBatchKMeans(n_clusters=N_FOLDS, random_state=seed, batch_size=16_384,
+                            n_init=10, max_iter=100, reassignment_ratio=0)
+    model.fit(shuffled)
+    ordered, _ = relabel_centroids(model.cluster_centers_)
+    return ordered
+
+
 def uniform_coordinate_sample(files: list[Path], sample_size: int = SAMPLE_ROWS) -> tuple[np.ndarray, np.ndarray]:
     """Draw exact uniform row positions without replacement, then stream selected coordinates.
 
@@ -76,9 +97,7 @@ def uniform_coordinate_sample(files: list[Path], sample_size: int = SAMPLE_ROWS)
     """
     counts = [pq.ParquetFile(path).metadata.num_rows for path in files]
     total = sum(counts)
-    if not 0 < sample_size <= total:
-        raise ValueError("Invalid fitting sample size")
-    positions = np.sort(np.asarray(random.Random(SEED).sample(range(total), sample_size), dtype=np.int64))
+    positions = uniform_positions(total, sample_size)
     id_chunks = []
     xy_chunks = []
     offset = 0
@@ -122,10 +141,4 @@ def fit_centroids(files: list[Path], *, sample_size: int = SAMPLE_ROWS, sample_i
 
             sample_ids_path.parent.mkdir(parents=True, exist_ok=True)
             pq.write_table(pa.table({"cell_id": pa.array(ids, type=pa.int64())}), sample_ids_path, compression="zstd")
-    rng = np.random.default_rng(SEED)
-    sample = sample[rng.permutation(len(sample))]
-    model = MiniBatchKMeans(n_clusters=N_FOLDS, random_state=SEED, batch_size=16_384,
-                            n_init=10, max_iter=100, reassignment_ratio=0)
-    model.fit(sample)
-    ordered, _ = relabel_centroids(model.cluster_centers_)
-    return ordered, len(sample)
+    return fit_coordinate_sample(sample), len(sample)

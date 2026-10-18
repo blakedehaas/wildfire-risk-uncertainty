@@ -47,3 +47,5 @@ wildfire-validate-folds = "wildfire_risk_uncertainty.spatial_validation.validate
 wildfire-reproduce-folds = "wildfire_risk_uncertainty.spatial_validation.reproduce_folds:main"
 wildfire-reproduce-fold-reports = "wildfire_risk_uncertainty.spatial_validation.reproduce_reports:main"
 wildfire-training-benchmark = "wildfire_risk_uncertainty.benchmark.cli:main"
+wildfire-inner-folds = "wildfire_risk_uncertainty.spatial_validation.inner_cli:main"
+wildfire-validate-inner-folds = "wildfire_risk_uncertainty.spatial_validation.validate_inner_folds:main"

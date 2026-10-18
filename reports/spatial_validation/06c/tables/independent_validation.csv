@@ -1,0 +1,8 @@
+check,passed
+all_five_uniform_samples_regenerated,True
+all_25_centroids_refit_byte_equal,True
+all_3060_partitions_regenerated_hash_equal,True
+all_110817231_canonical_ids_unique,True
+eligibility_exact_for_five_studies,True
+nearest_centroid_exact_for_all_eligible_rows,True
+target_support_counts_independently_recomputed,True
