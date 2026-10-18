@@ -4,6 +4,7 @@ import random
 import resource
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -15,6 +16,9 @@ from wildfire_risk_uncertainty.training.preprocessing import (
     PreprocessingState,
     transform,
 )
+
+if TYPE_CHECKING:
+    from wildfire_risk_uncertainty.training.cache import HpoCache
 
 BATCH_SIZE = 65536
 SEED = 42
@@ -50,13 +54,14 @@ def device_batch(batch: tuple[np.ndarray, ...], state: PreprocessingState) -> tu
 
 
 def _batches(root: Path, state: PreprocessingState, role: str, epoch: int | None,
-             outer_study: int, inner_fold: int, batch_size: int):
+             outer_study: int, inner_fold: int, batch_size: int,
+             cache: "HpoCache | None" = None):
     return packed_batches(inner_chunks(
         root / "artifacts/dataset/canonical/partitions",
         root / "artifacts/spatial_validation/05b/partitions",
         root / "artifacts/spatial_validation/06c/partitions",
         state.inputs, role=role, epoch=epoch, seed=SEED,
-        outer_study=outer_study, inner_fold=inner_fold,
+        outer_study=outer_study, inner_fold=inner_fold, cache=cache,
     ), batch_size)
 
 
@@ -76,13 +81,14 @@ def _metrics(bp_sum: float, flp_sum: float, bp_count: int, flp_count: int,
 
 def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
                 optimizer: torch.optim.AdamW, epoch: int, *, outer_study: int = 3,
-                inner_fold: int = 1, batch_size: int = BATCH_SIZE) -> dict:
+                inner_fold: int = 1, batch_size: int = BATCH_SIZE,
+                cache: "HpoCache | None" = None) -> dict:
     model.train()
     torch.cuda.reset_peak_memory_stats()
     start = time.perf_counter()
     bp_total = flp_total = 0.0
     bp_rows = flp_rows = steps = 0
-    for raw in _batches(root, state, "train", epoch, outer_study, inner_fold, batch_size):
+    for raw in _batches(root, state, "train", epoch, outer_study, inner_fold, batch_size, cache):
         features, bp, flp, valid = device_batch(raw, state)
         optimizer.zero_grad(set_to_none=True)
         with torch.autocast("cuda", dtype=torch.bfloat16):
@@ -114,13 +120,14 @@ def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
 @torch.no_grad()
 def validate(root: Path, state: PreprocessingState, model: RiskMLP,
              expected_rows: int, expected_flp: int, *, outer_study: int = 3,
-             inner_fold: int = 1, batch_size: int = BATCH_SIZE) -> dict:
+             inner_fold: int = 1, batch_size: int = BATCH_SIZE,
+             cache: "HpoCache | None" = None) -> dict:
     model.eval()
     torch.cuda.reset_peak_memory_stats()
     start = time.perf_counter()
     bp_total = flp_total = 0.0
     bp_rows = flp_rows = steps = 0
-    for raw in _batches(root, state, "validation", None, outer_study, inner_fold, batch_size):
+    for raw in _batches(root, state, "validation", None, outer_study, inner_fold, batch_size, cache):
         features, bp, flp, valid = device_batch(raw, state)
         with torch.autocast("cuda", dtype=torch.bfloat16):
             bp_logits, flp_logits = model(features)

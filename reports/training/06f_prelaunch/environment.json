@@ -1,0 +1,1 @@
+{"base_git_sha":"fb1cf795983a34e5e81b3a4bc662751a7a358235","cpu_affinity":32,"cpu_logical":32,"cuda_runtime":"13.0","gpu":"NVIDIA GeForce RTX 5080","gpu_vram_bytes":17094475776,"python":"3.12.14","system_memory_bytes":{"MemAvailable":30016479232,"MemTotal":32421666816},"torch":"2.13.0+cu130","workspace_free_bytes_after_cache":956843245568}

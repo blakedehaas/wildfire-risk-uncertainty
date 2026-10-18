@@ -150,6 +150,8 @@ def main() -> None:
     commands.add_parser("real-smoke")
     future = commands.add_parser("real-hpo", help="Future 6F use only; explicit authorization required")
     future.add_argument("--outer-study", type=int, choices=range(1, 6), required=True)
+    future.add_argument("--cache-dir", type=Path, required=True)
+    future.add_argument("--pause-after-epoch", type=int, choices=range(1, 101))
     future.add_argument("--checkpoint-6f-authorized", action="store_true", required=True)
     args = parser.parse_args()
     root = Path.cwd()
@@ -163,7 +165,8 @@ def main() -> None:
         real_smoke_validation(root)
     else:
         require_online_authentication()
-        run_real_hpo(root, args.outer_study)
+        run_real_hpo(root, args.outer_study, cache_dir=args.cache_dir,
+                     pause_after_epoch=args.pause_after_epoch)
 
 
 if __name__ == "__main__":

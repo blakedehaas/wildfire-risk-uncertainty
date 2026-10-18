@@ -84,12 +84,13 @@ def spatial_payload(record: dict) -> dict:
 class OnlineTracker:
     def __init__(self, *, outer_study: int, trial_number: int, configuration: dict,
                  provenance: dict, local_dir: Path, checkpoint: str,
-                 abort_on_failure: bool = False) -> None:
+                 abort_on_failure: bool = False, run_id: str | None = None) -> None:
         self.local_dir = local_dir
         self.abort_on_failure = abort_on_failure
         self.errors: list[str] = []
         self.sync_state = "online"
         self.start_time = time.perf_counter()
+        resume_kwargs = {"id": run_id, "resume": "must"} if run_id is not None else {}
         self.run = wandb.init(
             project="wildfire-risk-uncertainty", group=f"outer-{outer_study}",
             job_type="hpo-trial", name=f"outer-{outer_study}-trial-{trial_number:03d}",
@@ -97,6 +98,7 @@ class OnlineTracker:
             config={**configuration, **provenance, "outer_study": outer_study,
                     "trial_number": trial_number}, mode="online", dir=str(local_dir),
             settings=wandb.Settings(init_timeout=45),
+            **resume_kwargs,
         )
         if self.run is None:
             raise RuntimeError("W&B online initialization returned no run")

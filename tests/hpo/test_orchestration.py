@@ -272,6 +272,12 @@ def test_online_adapter_names_axes_summary_and_degraded_local_record(tmp_path, m
                             local_dir=tmp_path, checkpoint="checkpoint-6e")
     assert captured["name"] == "outer-3-trial-007" and captured["group"] == "outer-3"
     assert captured["job_type"] == "hpo-trial" and captured["mode"] == "online"
+    resumed_tracker = OnlineTracker(outer_study=3, trial_number=7,
+                                    configuration={"depth": 2}, provenance={"git_sha": "fixture"},
+                                    local_dir=tmp_path, checkpoint="checkpoint-6f",
+                                    run_id="fixture-id")
+    assert resumed_tracker.run_id == tracker.run_id
+    assert captured["id"] == "fixture-id" and captured["resume"] == "must"
     assert "WANDB_API_KEY" not in captured["config"]
     assert any(args == ("fold_3/*",) and kwargs.get("step_metric") == "fold_3/epoch"
                for args, kwargs in fake.axes)

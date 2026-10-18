@@ -2,21 +2,29 @@
 
 import csv
 import hashlib
+import signal
 import time
 from pathlib import Path
 
 import optuna
 
-from wildfire_risk_uncertainty.hpo.config import FIXED_SMOKE, suggest
+from wildfire_risk_uncertainty.hpo.config import FIXED_SMOKE, Configuration, suggest
 from wildfire_risk_uncertainty.hpo.objective import run_trial
 from wildfire_risk_uncertainty.hpo.records import read_json, write_json
+from wildfire_risk_uncertainty.hpo.resume import run_resumable_trial
 from wildfire_risk_uncertainty.hpo.storage import metadata, open_study, study_name
 from wildfire_risk_uncertainty.hpo.wandb_tracking import OnlineTracker
+from wildfire_risk_uncertainty.training.cache import HpoCache
+from wildfire_risk_uncertainty.training.cache_checkpoint import (
+    load_cache_checkpoint,
+    save_cache_checkpoint,
+)
 from wildfire_risk_uncertainty.training.data import inner_chunks, model_inputs
 from wildfire_risk_uncertainty.training.model import RiskMLP
 from wildfire_risk_uncertainty.training.preprocessing import (
     PreprocessingState,
     fit_preprocessing,
+    stable_json_bytes,
 )
 from wildfire_risk_uncertainty.training.trainer import (
     make_model,
@@ -97,15 +105,20 @@ def preprocessing_state(root: Path, outer_study: int, fold: int,
 
 class RealProvider:
     def __init__(self, root: Path, outer_study: int, configuration,
-                 states: dict[int, PreprocessingState], counts: dict[int, dict]) -> None:
+                 states: dict[int, PreprocessingState], counts: dict[int, dict],
+                 cache: HpoCache | None = None, trial_number: int | None = None,
+                 checkpoint_root: Path | None = None) -> None:
         self.root = root
         self.outer_study = outer_study
         self.configuration = configuration
         self.states = states
         self.counts = counts
+        self.cache = cache
+        self.trial_number = trial_number
+        self.checkpoint_root = checkpoint_root
         self.models = {}
 
-    def __call__(self, fold: int, epoch: int) -> tuple[dict, dict]:
+    def _model(self, fold: int):
         if fold not in self.models:
             seed_everything(42)
             self.models[fold] = make_model(
@@ -113,16 +126,58 @@ class RealProvider:
                 width=self.configuration.width, learning_rate=self.configuration.learning_rate,
                 weight_decay=self.configuration.weight_decay,
             )
-        model, optimizer = self.models[fold]
+        return self.models[fold]
+
+    def _checkpoint_path(self, fold: int, epoch: int) -> Path:
+        if self.checkpoint_root is None:
+            raise ValueError("Resumable HPO requires an explicit checkpoint directory")
+        return self.checkpoint_root / f"fold_{fold}_epoch_{epoch:03d}.pt"
+
+    def _checkpoint_metadata(self, fold: int) -> dict:
+        return {"outer_study": self.outer_study, "trial_number": self.trial_number,
+                "inner_fold": fold, "configuration": self.configuration.serializable(),
+                "seed": 42}
+
+    def restore(self, fold: int, completed_epoch: int, global_step: int) -> None:
+        if completed_epoch == 0:
+            self._model(fold)
+            return
+        if self.cache is None:
+            raise ValueError("Resumable HPO requires a validated cache")
+        model, optimizer = self._model(fold)
+        epoch, step = load_cache_checkpoint(
+            self._checkpoint_path(fold, completed_epoch), model, optimizer,
+            cache=self.cache, state=self.states[fold],
+            expected_metadata=self._checkpoint_metadata(fold))
+        if epoch != completed_epoch or step != global_step:
+            raise ValueError("Checkpoint epoch/optimizer step differs from local fold record")
+
+    def save(self, fold: int, epoch: int, global_step: int) -> None:
+        if self.cache is None:
+            raise ValueError("Resumable HPO requires a validated cache")
+        model, optimizer = self._model(fold)
+        save_cache_checkpoint(self._checkpoint_path(fold, epoch), model, optimizer,
+                              completed_epoch=epoch, global_step=global_step,
+                              cache=self.cache, state=self.states[fold],
+                              metadata=self._checkpoint_metadata(fold))
+
+    def cleanup(self, fold: int, epoch: int) -> None:
+        previous = self._checkpoint_path(fold, epoch - 2) if epoch > 2 else None
+        if previous is not None:
+            previous.unlink(missing_ok=True)
+            previous.with_suffix(previous.suffix + ".sha256.json").unlink(missing_ok=True)
+
+    def __call__(self, fold: int, epoch: int) -> tuple[dict, dict]:
+        model, optimizer = self._model(fold)
         state = self.states[fold]
         training = train_epoch(self.root, state, model, optimizer, epoch,
                                outer_study=self.outer_study, inner_fold=fold,
-                               batch_size=self.configuration.batch_size)
+                               batch_size=self.configuration.batch_size, cache=self.cache)
         validation = validate(self.root, state, model,
                               self.counts[fold]["validation"]["rows"],
                               self.counts[fold]["validation"]["flp_valid"],
                               outer_study=self.outer_study, inner_fold=fold,
-                              batch_size=self.configuration.batch_size)
+                              batch_size=self.configuration.batch_size, cache=self.cache)
         return training, validation
 
 
@@ -185,36 +240,93 @@ def run_smoke(root: Path) -> dict:
     return result
 
 
-def run_real_hpo(root: Path, outer_study: int) -> None:
-    """Future 6F entry point; the 6E command never calls this function."""
-    provenance = metadata(root, outer_study, kind="real_hpo")
+def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
+                 pause_after_epoch: int | None = None) -> None:
+    """Future 6F entry point; explicit accepted mmap cache and resumable trial only."""
+    from wildfire_risk_uncertainty.training.cache_states import load_states
+
+    cache = HpoCache(root, cache_dir)
+    plan = read_json(root / "reports/training/06f_prelaunch/projected_hpo_runtime.json")
+    cache_sha = hashlib.sha256(stable_json_bytes(cache.manifest)).hexdigest()
+    if not plan["accepted_mmap_for_6f"] or plan["cache_manifest_sha256"] != cache_sha:
+        raise ValueError("Validated HPO cache acceptance/provenance mismatch")
+    provenance = {**metadata(root, outer_study, kind="real_hpo"),
+                  "cache_version": cache.manifest["version"],
+                  "cache_manifest_sha256": cache_sha,
+                  "partition_offsets_sha256": cache.manifest["files_sha256"]["partition_offsets.npy"]}
     counts = support_counts(root, outer_study)
-    states = {fold: preprocessing_state(root, outer_study, fold, provenance, counts[fold])[0]
-              for fold in range(1, 6)}
+    states = load_states(root, cache, outer_study)
     name = study_name(outer_study)
     artifact = root / "artifacts/hpo"
     study = open_study(artifact / f"outer_{outer_study}.sqlite3", name, provenance)
-    if len(study.trials) > 30:
-        raise ValueError("Persisted study exceeds the frozen 30-trial budget")
+    requested_pause = False
 
-    def objective(trial: optuna.Trial) -> float:
-        configuration = suggest(trial)
+    def request_pause(_signal: int, _frame: object) -> None:
+        nonlocal requested_pause
+        requested_pause = True
+
+    signal.signal(signal.SIGINT, request_pause)
+    signal.signal(signal.SIGTERM, request_pause)
+    while True:
+        trials = study.get_trials(deepcopy=True)
+        if len(trials) > 30 or any(t.state == optuna.trial.TrialState.FAIL for t in trials):
+            raise ValueError("Real study exceeded 30 trials or contains FAILED trial; stop for HITL")
+        running = [t for t in trials if t.state == optuna.trial.TrialState.RUNNING]
+        if len(running) > 1:
+            raise ValueError("More than one RUNNING trial in frozen single-worker study")
+        if not running and len(trials) == 30:
+            return
+        if running:
+            trial = optuna.Trial(study, running[0]._trial_id)
+            saved = trial.user_attrs.get("suggested_configuration")
+            if saved is None:
+                if (artifact / "records" / name / f"trial_{trial.number:03d}" / "manifest.json").exists():
+                    raise ValueError("RUNNING trial has local work but no persisted configuration")
+                configuration = suggest(trial)
+                trial.set_user_attr("suggested_configuration", configuration.serializable())
+            else:
+                configuration = Configuration(**saved)
+                if configuration.serializable() != trial.params:
+                    raise ValueError("RUNNING Optuna trial configuration mismatch")
+        else:
+            trial = study.ask()
+            configuration = suggest(trial)
+            trial.set_user_attr("suggested_configuration", configuration.serializable())
         local_dir = artifact / "records" / name / f"trial_{trial.number:03d}"
         local_dir.mkdir(parents=True, exist_ok=True)
-        provider = RealProvider(root, outer_study, configuration, states, counts)
+        provider = RealProvider(root, outer_study, configuration, states, counts,
+                                cache=cache, trial_number=trial.number,
+                                checkpoint_root=local_dir / "checkpoints")
         model_parameter_count = sum(p.numel() for p in RiskMLP(
             len(states[1].inputs), depth=configuration.depth, width=configuration.width,
         ).parameters())
+        link = local_dir / "wandb_link.json"
+        run_id = read_json(link)["run_id"] if link.exists() else None
         tracker = OnlineTracker(outer_study=outer_study, trial_number=trial.number,
                                 configuration=configuration.serializable(),
                                 provenance={**provenance,
                                     "preprocessing_hashes_by_fold": {str(k): states[k].digest() for k in states},
                                     "model_parameter_count": model_parameter_count},
-                                local_dir=local_dir, checkpoint="checkpoint-6f")
-        return run_trial(trial=trial, outer_study=outer_study, configuration=configuration,
-                         provider=provider, record_root=artifact / "records", study_name=name,
-                         provenance=provenance, tracker=tracker, max_epochs=100)
-
-    remaining = 30 - len(study.trials)
-    if remaining:
-        study.optimize(objective, n_trials=remaining, n_jobs=1)
+                                local_dir=local_dir, checkpoint="checkpoint-6f", run_id=run_id)
+        if not link.exists():
+            write_json(link, {"run_id": tracker.run_id, "run_url": tracker.run_url})
+        try:
+            result = run_resumable_trial(
+                trial=trial, outer_study=outer_study, configuration=configuration,
+                provider=provider, record_root=artifact / "records", study_name=name,
+                provenance=provenance, tracker=tracker, max_epochs=100,
+                pause_after_epoch=pause_after_epoch,
+                pause_requested=lambda: requested_pause)
+        except optuna.TrialPruned:
+            study.tell(trial, state=optuna.trial.TrialState.PRUNED)
+            if requested_pause:
+                return
+        except Exception:
+            study.tell(trial, state=optuna.trial.TrialState.FAIL)
+            raise
+        else:
+            if result is None:
+                return  # Leave this exact trial RUNNING for a later invocation.
+            study.tell(trial, result)
+            if requested_pause:
+                return

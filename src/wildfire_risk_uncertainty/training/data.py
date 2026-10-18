@@ -4,9 +4,13 @@ import csv
 import json
 from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pyarrow.parquet as pq
+
+if TYPE_CHECKING:
+    from wildfire_risk_uncertainty.training.cache import HpoCache
 
 EXTRA_INPUTS = (
     "wui_covered_fraction",
@@ -157,14 +161,20 @@ def inner_chunks(
     seed: int = 42,
     outer_study: int = 3,
     inner_fold: int = 1,
+    cache: "HpoCache | None" = None,
+    include_ids: bool = False,
 ) -> Iterator[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
     """Deterministic bounded-memory stream; epoch shuffles tiles and rows exactly once."""
+    if cache is not None:
+        yield from cache.chunks(outer_study=outer_study, inner_fold=inner_fold,
+                                role=role, epoch=epoch, seed=seed, include_ids=include_ids)
+        return
     paths = inner_partition_paths(canonical_dir, outer_dir, inner_dir)
     rng = np.random.default_rng(np.random.SeedSequence([seed, epoch])) if epoch is not None else None
     if rng is not None:
         rng.shuffle(paths)
     for path in paths:
-        features, bp, flp, valid, _ids = inner_partition(
+        features, bp, flp, valid, ids = inner_partition(
             path, outer_dir, inner_dir, inputs, role=role,
             outer_study=outer_study, inner_fold=inner_fold,
         )
@@ -173,7 +183,8 @@ def inner_chunks(
         if rng is not None:
             order = rng.permutation(len(bp))
             features, bp, flp, valid = features[order], bp[order], flp[order], valid[order]
-        yield features, bp, flp, valid
+            ids = ids[order]
+        yield (features, bp, flp, valid, ids) if include_ids else (features, bp, flp, valid)
 
 
 def packed_batches(
