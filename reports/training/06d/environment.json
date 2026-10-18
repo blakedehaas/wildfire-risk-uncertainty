@@ -1,0 +1,1 @@
+{"bf16_supported":true,"gpu":"NVIDIA GeForce RTX 5080","numpy":"2.5.3","pyarrow":"23.0.1","python":"3.12.14","torch":"2.13.0+cu130","torch_cuda":"13.0"}

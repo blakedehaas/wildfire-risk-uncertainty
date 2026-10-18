@@ -1,0 +1,1 @@
+{"all_recorded_passes_have_exact_expected_counts":true,"deterministic_data_order":"seed-sequence-42-epoch-tile-permutation-and-within-tile-permutation-v1","train_flp_valid_per_epoch":41732573,"train_rows_per_epoch":61042788,"validation_flp_valid_per_pass":15909640,"validation_rows_per_pass":18476910}
