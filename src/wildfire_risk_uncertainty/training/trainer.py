@@ -66,9 +66,11 @@ def _metrics(bp_sum: float, flp_sum: float, bp_count: int, flp_count: int,
         raise ValueError("Both task supports must be nonempty")
     return {"bp_loss": bp_sum / bp_count, "flp_loss": flp_sum / flp_count,
             "combined_loss": 0.5 * (bp_sum / bp_count + flp_sum / flp_count),
+            "bp_loss_sum": bp_sum, "flp_loss_sum": flp_sum,
             "bp_rows": bp_count, "flp_valid_rows": flp_count, "optimizer_steps": steps,
             "wall_seconds": seconds, "rows_per_second": bp_count / seconds,
             "peak_vram_bytes": torch.cuda.max_memory_allocated(),
+            "peak_reserved_vram_bytes": torch.cuda.max_memory_reserved(),
             "peak_rss_bytes": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024}
 
 

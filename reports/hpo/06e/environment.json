@@ -1,0 +1,1 @@
+{"base_git_sha":"d719dfafbbbe0475960e19a13149fa5d255ebcb0","bf16":true,"cuda_runtime":"13.0","gpu":"NVIDIA GeForce RTX 5080","numpy":"2.5.3","optuna":"5.0.0","pyarrow":"23.0.1","python":"3.12.14","torch":"2.13.0+cu130","wandb":"0.30.0"}

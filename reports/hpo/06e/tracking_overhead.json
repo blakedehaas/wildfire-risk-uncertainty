@@ -1,0 +1,1 @@
+{"interpretation":"Combined Optuna, local/W&B tracking, model setup, and other orchestration time; W&B-only overhead was not isolated.","optuna_trial_wall_seconds":215.682787,"other_trial_wall_seconds":3.008529655040803,"preprocessing_scan_seconds_before_trial":250.98081605001062,"summed_training_validation_wall_seconds":212.6742573449592}
