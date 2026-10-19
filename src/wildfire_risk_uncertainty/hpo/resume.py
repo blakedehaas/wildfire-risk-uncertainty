@@ -83,29 +83,60 @@ def run_resumable_trial(*, trial: optuna.Trial, outer_study: int,
     for fold in range(1, 6):
         last = completed[fold]
         step = read_json(local.path / f"fold_{fold}_epoch_{last:03d}.json")["global_optimizer_step"] if last else 0
-        provider.restore(fold, last, step)
         steps[fold] = step
+    concurrent = all(hasattr(provider, name) for name in
+                     ("restore_many", "run_epoch", "save_many", "cleanup_many"))
+    if concurrent:
+        provider.restore_many(completed, steps)
+    else:
+        for fold in range(1, 6):
+            provider.restore(fold, completed[fold], steps[fold])
     started = time.perf_counter()
     last_common = 0
     for epoch in range(1, max_epochs + 1):
         folds = []
-        for fold in range(1, 6):
-            if epoch <= completed[fold]:
-                record = read_json(local.path / f"fold_{fold}_epoch_{epoch:03d}.json")
-            else:
-                training, validation = provider(fold, epoch)
-                steps[fold] += training["optimizer_steps"]
-                record = fold_epoch_record(
-                    outer_study=outer_study, trial_number=trial.number, inner_fold=fold,
-                    epoch=epoch, configuration=config, training=training,
-                    validation=validation, global_step=steps[fold],
-                    milestone=epoch in MILESTONES)
-                provider.save(fold, epoch, steps[fold])
-                local.fold(record)
-                provider.cleanup(fold, epoch)
-                tracker.fold(record)
-                completed[fold] = epoch
-            folds.append(record)
+        if concurrent:
+            missing = [fold for fold in range(1, 6) if epoch > completed[fold]]
+            results = provider.run_epoch(epoch, missing) if missing else {}
+            new_records = {}
+            for fold in range(1, 6):
+                if epoch <= completed[fold]:
+                    record = read_json(local.path / f"fold_{fold}_epoch_{epoch:03d}.json")
+                else:
+                    training, validation = results[fold]
+                    steps[fold] += training["optimizer_steps"]
+                    record = fold_epoch_record(
+                        outer_study=outer_study, trial_number=trial.number, inner_fold=fold,
+                        epoch=epoch, configuration=config, training=training,
+                        validation=validation, global_step=steps[fold],
+                        milestone=epoch in MILESTONES)
+                    new_records[fold] = record
+                folds.append(record)
+            if new_records:
+                provider.save_many({fold: (epoch, steps[fold]) for fold in new_records})
+                for fold, record in new_records.items():
+                    local.fold(record)
+                    tracker.fold(record)
+                    completed[fold] = epoch
+                provider.cleanup_many({fold: epoch for fold in new_records})
+        else:
+            for fold in range(1, 6):
+                if epoch <= completed[fold]:
+                    record = read_json(local.path / f"fold_{fold}_epoch_{epoch:03d}.json")
+                else:
+                    training, validation = provider(fold, epoch)
+                    steps[fold] += training["optimizer_steps"]
+                    record = fold_epoch_record(
+                        outer_study=outer_study, trial_number=trial.number, inner_fold=fold,
+                        epoch=epoch, configuration=config, training=training,
+                        validation=validation, global_step=steps[fold],
+                        milestone=epoch in MILESTONES)
+                    provider.save(fold, epoch, steps[fold])
+                    local.fold(record)
+                    provider.cleanup(fold, epoch)
+                    tracker.fold(record)
+                    completed[fold] = epoch
+                folds.append(record)
         calculated = aggregate(epoch, folds)
         aggregate_path = local.path / f"aggregate_epoch_{epoch:03d}.json"
         if aggregate_path.exists():

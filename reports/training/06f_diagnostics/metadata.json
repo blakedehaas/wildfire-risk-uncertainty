@@ -1,0 +1,182 @@
+{
+  "artifacts": {
+    "learning_curves.csv": {
+      "rows": 159,
+      "sha256": "1a1cce0506ab070f61a91641871cd80d3305520015f977ba7c99117c4fe3c504"
+    },
+    "rung_records.csv": {
+      "rows": 43,
+      "sha256": "64992c5ec92fe88bbe855c28ede45ac4d8fe4c8d214f6c121004bad7ad470219"
+    },
+    "trial_summary.csv": {
+      "rows": 30,
+      "sha256": "33c203f8148c0137c5c2018a44d86d8f5faf8b98df740f24c095d60e76d0e44e"
+    }
+  },
+  "column_conventions": {
+    "fold_specific_columns": "fold_1_ through fold_5_ prefixes",
+    "loss_components": "raw sums, support counts, derived means, and equal-task objective are exported for training and validation",
+    "sum_fold_work_wall_seconds": "derived sum of recorded fold training and validation wall times; not an observed whole-epoch clock"
+  },
+  "frozen_study_metadata": {
+    "cache_manifest_sha256": "7e3089929d53173b0181ba7245de9e228929dad38d3c4567d2cf5d154bbc196f",
+    "cache_version": "hpo-canonical-row-aligned-v1",
+    "feature_order_sha256": "ff5851a7bf64b21e7f4c91e69cbe17ec8d4186248a67b76c9a6963d88aaea3fe",
+    "hpo_schema_version": "nested-spatial-hpo-v1",
+    "inner_fold_manifest_sha256": "c2b9058d25b5691b290a5f1f19961ac9d9e791380ca152ef6473532c1f6685f5",
+    "kind": "real_hpo",
+    "maximum_resource_epochs": 100,
+    "outer_fold_manifest_sha256": "acbea6ccc253c6ddb610be5cf849582d78e79c7fe8ea6ab3978c0836f18fe7db",
+    "outer_study": 1,
+    "partition_offsets_sha256": "d28e0edf101606a06324bf869cb64646053948845fcb57bb3d139f0da5db9423",
+    "pruner": {
+      "min_early_stopping_rate": 0,
+      "min_resource": 1,
+      "name": "SuccessiveHalvingPruner",
+      "reduction_factor": 4
+    },
+    "sampler": {
+      "name": "TPESampler",
+      "seed": 42
+    },
+    "search_space": {
+      "batch_size": {
+        "choices": [
+          32768,
+          65536,
+          131072
+        ],
+        "type": "categorical"
+      },
+      "depth": {
+        "choices": [
+          2,
+          3
+        ],
+        "type": "categorical"
+      },
+      "learning_rate": {
+        "high": 0.01,
+        "log": true,
+        "low": 0.0001,
+        "type": "float"
+      },
+      "weight_decay": {
+        "high": 0.01,
+        "log": true,
+        "low": 1e-05,
+        "type": "float"
+      },
+      "width": {
+        "choices": [
+          64,
+          128,
+          256
+        ],
+        "type": "categorical"
+      }
+    },
+    "search_space_sha256": "1bbb3fca352bf444f183ca10263a8d22653d3592d9f3adf42bf10e12cc12de46",
+    "seed": 42,
+    "source_git_sha": "8db4238c5f9b141ea67a5a8a746488d1ff2cc0ed",
+    "training_implementation_version": "checkpoint-6d-frozen-v1"
+  },
+  "local_record_root": "artifacts/hpo/records/wildfire_outer_1_hpo_v1",
+  "optuna_version": "5.0.0",
+  "outer_study": 1,
+  "pruner": {
+    "constructor": "SuccessiveHalvingPruner(min_resource=1, reduction_factor=4, min_early_stopping_rate=0)",
+    "optuna_5_constructor_defaults": {
+      "bootstrap_count": 0,
+      "min_early_stopping_rate": 0,
+      "min_resource": "auto",
+      "reduction_factor": 4
+    },
+    "resolved_internal_parameters": {
+      "bootstrap_count": 0,
+      "min_early_stopping_rate": 0,
+      "min_resource": 1,
+      "reduction_factor": 4
+    }
+  },
+  "resource": {
+    "comparison_epochs": [
+      1,
+      4,
+      16,
+      64
+    ],
+    "five_fold_aggregation": "arithmetic mean of five validation equal-task objectives",
+    "maximum_epochs": 100,
+    "unit": "epoch",
+    "validation_frequency": "every epoch"
+  },
+  "sampler": {
+    "constructor": "TPESampler(seed=42)",
+    "explicit_parameters": {
+      "seed": 42
+    },
+    "optuna_5_constructor_defaults": {
+      "consider_endpoints": null,
+      "consider_magic_clip": null,
+      "consider_prior": null,
+      "constant_liar": true,
+      "constraints_func": null,
+      "gamma": null,
+      "group": false,
+      "multivariate": null,
+      "n_ei_candidates": 24,
+      "n_startup_trials": 10,
+      "prior_weight": null,
+      "seed": null,
+      "warn_independent_sampling": null,
+      "weights": null
+    },
+    "resolved_internal_parameters": {
+      "consider_endpoints": false,
+      "consider_magic_clip": true,
+      "constant_liar": true,
+      "constraints_func": null,
+      "gamma": null,
+      "group": false,
+      "multivariate_option": null,
+      "n_ei_candidates": 24,
+      "n_startup_trials": 10,
+      "parzen_multivariate": true,
+      "prior_weight": 1.0,
+      "warn_independent_sampling": false,
+      "weights_callable": "optuna.samplers._tpe.sampler.default_weights"
+    }
+  },
+  "source_git_sha": "8db4238c5f9b141ea67a5a8a746488d1ff2cc0ed",
+  "study_name": "wildfire_outer_1_hpo_v1",
+  "study_storage": "artifacts/hpo/outer_1.sqlite3",
+  "unavailable_fields": [
+    "per-epoch wall-clock start/end timestamps",
+    "whole-epoch elapsed wall time including orchestration overhead",
+    "100-epoch final objective for PRUNED trials",
+    "post-pruning learning-curve values"
+  ],
+  "validation": {
+    "checks": [
+      "trial and study identity",
+      "configuration and provenance equality",
+      "local state and Optuna terminal state",
+      "contiguous recorded epochs",
+      "five fold records per epoch",
+      "fold supports against frozen 6C report",
+      "raw loss sums/counts against recorded means",
+      "five-fold aggregate recomputation",
+      "Optuna intermediate and completed-rung values",
+      "COMPLETE final objective",
+      "W&B run ID and URL linkage"
+    ],
+    "epoch_level_records": 159,
+    "fold_epoch_records": 795,
+    "online_wandb_history_requeried": false,
+    "optuna_rung_records": 43,
+    "passed": true,
+    "trials": 30,
+    "unique_wandb_run_ids": 30
+  }
+}

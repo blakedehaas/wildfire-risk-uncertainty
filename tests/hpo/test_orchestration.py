@@ -24,6 +24,7 @@ from wildfire_risk_uncertainty.hpo.records import (
     task_metrics,
     write_json,
 )
+from wildfire_risk_uncertainty.hpo.resume import run_resumable_trial
 from wildfire_risk_uncertainty.hpo.storage import metadata, open_study
 from wildfire_risk_uncertainty.hpo.synthetic import raw_metrics
 from wildfire_risk_uncertainty.hpo.visualization import (
@@ -40,6 +41,53 @@ from wildfire_risk_uncertainty.hpo.wandb_tracking import (
 )
 from wildfire_risk_uncertainty.training.data import model_inputs
 from wildfire_risk_uncertainty.training.preprocessing import PreprocessingState
+
+
+class BatchToyProvider:
+    def __init__(self, penalty: float, checkpoints: dict | None = None) -> None:
+        self.penalty = penalty
+        self.checkpoints = checkpoints if checkpoints is not None else {}
+        self.states = {}
+
+    def restore_many(self, completed, steps):
+        self.states = {fold: self.checkpoints.get((fold, completed[fold]), 0)
+                       for fold in range(1, 6)}
+
+    def run_epoch(self, epoch, folds):
+        result = {}
+        for fold in folds:
+            self.states[fold] += 1
+            value = 0.2 + self.penalty + fold / 100 + self.states[fold] / 1000
+            result[fold] = (raw_metrics(value, 0.8 + value),
+                            raw_metrics(value + 0.1, 0.9 + value))
+        return result
+
+    def save_many(self, folds):
+        for fold, (epoch, _step) in folds.items():
+            self.checkpoints[(fold, epoch)] = self.states[fold]
+
+    def cleanup_many(self, folds):
+        pass
+
+
+class SequentialToyProvider:
+    def __init__(self, penalty: float) -> None:
+        self.penalty = penalty
+        self.states = {}
+
+    def restore(self, fold, completed_epoch, global_step):
+        self.states[fold] = completed_epoch
+
+    def __call__(self, fold, epoch):
+        self.states[fold] += 1
+        value = 0.2 + self.penalty + fold / 100 + self.states[fold] / 1000
+        return raw_metrics(value, 0.8 + value), raw_metrics(value + 0.1, 0.9 + value)
+
+    def save(self, fold, epoch, global_step):
+        pass
+
+    def cleanup(self, fold, epoch):
+        pass
 
 
 def test_frozen_sampler_pruner_space_and_seed() -> None:
@@ -339,3 +387,58 @@ def test_cached_preprocessing_rejects_wrong_fold_provenance(tmp_path, monkeypatc
                   "outer_fold_manifest_sha256": "outer"}
     with pytest.raises(ValueError, match="provenance mismatch"):
         preprocessing_state(tmp_path, 3, 1, provenance, {"train": {"rows": 10, "flp_valid": 8}})
+
+
+def test_concurrent_batch_path_matches_sequential_pruning(tmp_path) -> None:
+    snapshots = []
+    for mode in ("sequential", "concurrent"):
+        study = optuna.create_study(sampler=sampler(), pruner=pruner())
+        record_root = tmp_path / mode
+
+        def objective(trial, mode=mode, record_root=record_root):
+            configuration = suggest(trial)
+            provider = (SequentialToyProvider(trial.number * 0.5)
+                        if mode == "sequential" else BatchToyProvider(trial.number * 0.5))
+            return run_resumable_trial(
+                trial=trial, outer_study=1, configuration=configuration,
+                provider=provider, record_root=record_root, study_name="pruning_fixture",
+                provenance={"fixture": True}, tracker=MockTracker(), max_epochs=4)
+
+        study.optimize(objective, n_trials=4, n_jobs=1)
+        snapshots.append([{"number": trial.number, "state": trial.state.name,
+                           "intermediate": dict(trial.intermediate_values), "value": trial.value}
+                          for trial in study.trials])
+    assert snapshots[0] == snapshots[1]
+    assert any(row["state"] == "PRUNED" for row in snapshots[0])
+    for trial in range(4):
+        left = tmp_path / "sequential/pruning_fixture" / f"trial_{trial:03d}"
+        right = tmp_path / "concurrent/pruning_fixture" / f"trial_{trial:03d}"
+        assert [read_json(path)["J_e"] for path in sorted(left.glob("aggregate_*.json"))] == [
+            read_json(path)["J_e"] for path in sorted(right.glob("aggregate_*.json"))]
+
+
+def test_concurrent_batch_pause_resume_has_no_duplicate_records(tmp_path) -> None:
+    study = optuna.create_study(sampler=sampler(), pruner=optuna.pruners.NopPruner())
+    trial = study.ask()
+    configuration = suggest(trial)
+    checkpoints = {}
+    tracker = MockTracker()
+    common = {"trial": trial, "outer_study": 1, "configuration": configuration,
+              "record_root": tmp_path, "study_name": "resume_fixture",
+              "provenance": {"fixture": True}, "max_epochs": 4}
+    result = run_resumable_trial(
+        **common, provider=BatchToyProvider(0.0, checkpoints), tracker=tracker,
+        pause_after_epoch=2)
+    assert result is None and study.trials[0].state.name == "RUNNING"
+    run_id = read_json(tmp_path / "resume_fixture/trial_000/wandb_link.json")["run_id"]
+    resumed_tracker = MockTracker()
+    result = run_resumable_trial(
+        **common, provider=BatchToyProvider(0.0, checkpoints), tracker=resumed_tracker)
+    assert result is not None
+    study.tell(trial, result)
+    local = tmp_path / "resume_fixture/trial_000"
+    assert len(list(local.glob("fold_*_epoch_*.json"))) == 20
+    assert len(list(local.glob("aggregate_epoch_*.json"))) == 4
+    assert study.trials[0].number == 0 and study.trials[0].state.name == "COMPLETE"
+    assert run_id == tracker.run_id == resumed_tracker.run_id
+    assert len(resumed_tracker.events) == 12

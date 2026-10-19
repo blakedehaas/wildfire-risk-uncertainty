@@ -107,7 +107,8 @@ class RealProvider:
     def __init__(self, root: Path, outer_study: int, configuration,
                  states: dict[int, PreprocessingState], counts: dict[int, dict],
                  cache: HpoCache | None = None, trial_number: int | None = None,
-                 checkpoint_root: Path | None = None) -> None:
+                 checkpoint_root: Path | None = None,
+                 retain_checkpoints: bool = False) -> None:
         self.root = root
         self.outer_study = outer_study
         self.configuration = configuration
@@ -116,6 +117,7 @@ class RealProvider:
         self.cache = cache
         self.trial_number = trial_number
         self.checkpoint_root = checkpoint_root
+        self.retain_checkpoints = retain_checkpoints
         self.models = {}
 
     def _model(self, fold: int):
@@ -162,6 +164,8 @@ class RealProvider:
                               metadata=self._checkpoint_metadata(fold))
 
     def cleanup(self, fold: int, epoch: int) -> None:
+        if self.retain_checkpoints:
+            return
         previous = self._checkpoint_path(fold, epoch - 2) if epoch > 2 else None
         if previous is not None:
             previous.unlink(missing_ok=True)
@@ -243,6 +247,7 @@ def run_smoke(root: Path) -> dict:
 def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
                  pause_after_epoch: int | None = None) -> None:
     """Future 6F entry point; explicit accepted mmap cache and resumable trial only."""
+    from wildfire_risk_uncertainty.hpo.fold_workers import PersistentFoldProvider
     from wildfire_risk_uncertainty.training.cache_states import load_states
 
     cache = HpoCache(root, cache_dir)
@@ -254,7 +259,6 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
                   "cache_version": cache.manifest["version"],
                   "cache_manifest_sha256": cache_sha,
                   "partition_offsets_sha256": cache.manifest["files_sha256"]["partition_offsets.npy"]}
-    counts = support_counts(root, outer_study)
     states = load_states(root, cache, outer_study)
     name = study_name(outer_study)
     artifact = root / "artifacts/hpo"
@@ -292,11 +296,17 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
             trial = study.ask()
             configuration = suggest(trial)
             trial.set_user_attr("suggested_configuration", configuration.serializable())
+        execution = {"inner_fold_workers": 2, "persistent_workers": True,
+                     "common_epoch_barrier": True, "optuna_n_jobs": 1}
+        saved_execution = trial.user_attrs.get("fold_execution")
+        if saved_execution is not None and saved_execution != execution:
+            raise ValueError("RUNNING Optuna trial fold-execution topology mismatch")
+        trial.set_user_attr("fold_execution", execution)
         local_dir = artifact / "records" / name / f"trial_{trial.number:03d}"
         local_dir.mkdir(parents=True, exist_ok=True)
-        provider = RealProvider(root, outer_study, configuration, states, counts,
-                                cache=cache, trial_number=trial.number,
-                                checkpoint_root=local_dir / "checkpoints")
+        provider = PersistentFoldProvider(
+            root, outer_study, configuration, cache_path=cache_dir,
+            trial_number=trial.number, checkpoint_root=local_dir / "checkpoints")
         model_parameter_count = sum(p.numel() for p in RiskMLP(
             len(states[1].inputs), depth=configuration.depth, width=configuration.width,
         ).parameters())
@@ -306,17 +316,21 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
                                 configuration=configuration.serializable(),
                                 provenance={**provenance,
                                     "preprocessing_hashes_by_fold": {str(k): states[k].digest() for k in states},
-                                    "model_parameter_count": model_parameter_count},
+                                    "model_parameter_count": model_parameter_count,
+                                    "fold_execution": execution},
                                 local_dir=local_dir, checkpoint="checkpoint-6f", run_id=run_id)
         if not link.exists():
             write_json(link, {"run_id": tracker.run_id, "run_url": tracker.run_url})
         try:
-            result = run_resumable_trial(
-                trial=trial, outer_study=outer_study, configuration=configuration,
-                provider=provider, record_root=artifact / "records", study_name=name,
-                provenance=provenance, tracker=tracker, max_epochs=100,
-                pause_after_epoch=pause_after_epoch,
-                pause_requested=lambda: requested_pause)
+            try:
+                result = run_resumable_trial(
+                    trial=trial, outer_study=outer_study, configuration=configuration,
+                    provider=provider, record_root=artifact / "records", study_name=name,
+                    provenance=provenance, tracker=tracker, max_epochs=100,
+                    pause_after_epoch=pause_after_epoch,
+                    pause_requested=lambda: requested_pause)
+            finally:
+                provider.close()
         except optuna.TrialPruned:
             study.tell(trial, state=optuna.trial.TrialState.PRUNED)
             if requested_pause:

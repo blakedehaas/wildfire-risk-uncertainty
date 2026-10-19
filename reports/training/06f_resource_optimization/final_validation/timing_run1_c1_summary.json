@@ -1,0 +1,1 @@
+{"available_ram_at_start_bytes":30134992896,"concurrency":1,"epochs":1,"mean_gpu_util_percent":8.615384615384615,"min_available_ram_bytes":28490223616,"peak_gpu_vram_mib":2317.0,"peak_swap_used_bytes":8192,"rows":422496985,"run":1,"samples":91,"suite":"timing","wall_seconds":185.53305716300383,"warm_cache_seconds_excluded":8.520848487009062}
