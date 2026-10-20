@@ -1,0 +1,46 @@
+{
+  "all_25_inner_folds_train_rows_per_epoch": 1605613836,
+  "all_25_inner_folds_validation_rows_per_epoch": 401403459,
+  "projections": [
+    {
+      "processes": 1,
+      "repeat": 0,
+      "train_rows_per_second": 1717708.5305453306,
+      "train_only_eval_rows_per_second": 4867392.581550321,
+      "all_25_folds_100_epochs_hours": 28.255821874993902,
+      "one_outer_five_folds_100_epochs_hours": 5.651164374998781
+    },
+    {
+      "processes": 1,
+      "repeat": 1,
+      "train_rows_per_second": 3251850.0911246333,
+      "train_only_eval_rows_per_second": 6314146.150869466,
+      "all_25_folds_100_epochs_hours": 15.481278926350551,
+      "one_outer_five_folds_100_epochs_hours": 3.0962557852701096
+    },
+    {
+      "processes": 2,
+      "repeat": 0,
+      "train_rows_per_second": 3921699.801460148,
+      "train_only_eval_rows_per_second": 6097685.03729098,
+      "all_25_folds_100_epochs_hours": 13.2012961479305,
+      "one_outer_five_folds_100_epochs_hours": 2.6402592295861007
+    },
+    {
+      "processes": 2,
+      "repeat": 1,
+      "train_rows_per_second": 5393912.10583131,
+      "train_only_eval_rows_per_second": 10505433.666564604,
+      "all_25_folds_100_epochs_hours": 9.330017074940985,
+      "one_outer_five_folds_100_epochs_hours": 1.866003414988197
+    }
+  ],
+  "assumptions": [
+    "100 full epochs for every inner fold",
+    "training and validation every epoch",
+    "short window rates persist through full epochs",
+    "all folds have approximately same throughput",
+    "no checkpoint or orchestration overhead",
+    "cold and warm repeats bracket observed cache state, not confidence limits"
+  ]
+}
