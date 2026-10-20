@@ -3,6 +3,8 @@
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts/benchmark_07a_detached.py"
 
 
@@ -36,3 +38,22 @@ def test_full_epoch_configuration_stays_within_validated_limit():
     assert module.CONFIG["data_loader_workers"] == 0
     assert module.CONFIG["gpu_vram_stop_mib"] == 15500
     assert module.CONFIG["folds"] == [1, 2, 3, 4, 5]
+    assert module.CONFIG["epochs"] == 3
+
+
+def test_epoch_one_reference_mismatch_is_persisted(tmp_path):
+    module = load_module()
+    module.RUNS = tmp_path
+    reference = tmp_path / "old"
+    reference.mkdir()
+    training = {key: 1 for key in ("bp_loss", "flp_loss", "combined_loss",
+                                   "bp_loss_sum", "flp_loss_sum", "bp_rows",
+                                   "flp_valid_rows", "optimizer_steps")}
+    module.write(reference / "fold_1.json", {"state_sha256": "state",
+                                              "training": training})
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    with pytest.raises(ValueError, match="reference mismatch"):
+        module.reference_check(candidate, {"reference_run": "old"}, 1,
+                               {**training, "bp_loss": 2.0}, "state")
+    assert module.read(candidate / "fold_1.reference_check.json")["differences"]["bp_loss"] == [1, 2.0]
