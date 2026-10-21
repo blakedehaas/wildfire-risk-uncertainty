@@ -7,7 +7,11 @@ The launcher is `scripts/benchmark_07a_detached.py`. It stores each run under `a
 .venv/bin/python scripts/benchmark_07a_detached.py status EXPERIMENT_ID
 .venv/bin/python scripts/benchmark_07a_detached.py results EXPERIMENT_ID
 .venv/bin/python scripts/benchmark_07a_detached.py stop EXPERIMENT_ID
+.venv/bin/python scripts/benchmark_07a_detached.py resume EXPERIMENT_ID
+.venv/bin/python scripts/benchmark_07a_detached.py analyze EXPERIMENT_ID
 ```
+
+`resume` applies to stopped or failed Pareto experiments and restores each task from its last complete provenance-bound checkpoint. Resource samples append across attempts. Pareto launch requires a clean committed worktree; resume also requires the original source commit. `analyze` requires every task to complete its full 100 epochs. The future Pareto launch command is `launch --kind pareto`; it is intentionally **not run** during the Phase 7A implementation review. It loads the committed production CUDA BF16 gradient-probe proposals and verifies the hashed source files before creating 150 fold tasks.
 
 The final calibration executes **three production `train_epoch` passes and three full inner-validation passes** for each of the five frozen inner folds of outer study 3. The prior one-epoch training-only run remains the numerical reference. It uses the validated mmap cache, fold-specific preprocessing states, 33 inputs, three hidden layers of width 128, BF16, AdamW with learning rate 0.001 and weight decay 0.000316227766, batch size 65,536, and seed 42. There are two concurrent fold workers, each with four PyTorch intra-op threads and partitioned CPU affinity. Validation reads only frozen inner VALIDATION rows within outer TRAIN. Outer TEST is never read. The run is a throughput and correctness calibration, not a model-selection run.
 

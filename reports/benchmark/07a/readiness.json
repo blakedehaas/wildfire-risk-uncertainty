@@ -1,0 +1,47 @@
+{
+  "audit_script_sha256": "22eac2ff48e84f342eee3de4987b4e1ddebb1a9bec107c994a7ca4fa7f0c8c40",
+  "calibration_experiment_id": "07a-20261020T193344Z-f965d452",
+  "checkpoint_bytes_total": 7304315,
+  "checkpoint_load_seconds_total": 0.06390653597190976,
+  "checkpoint_save_seconds_total": 0.11880917893722653,
+  "checks": {
+    "checkpoint_sha256_and_restore": true,
+    "complete_lifecycle": true,
+    "constant_validation_and_training_support": true,
+    "finite_losses_and_gradients": true,
+    "frozen_configuration": true,
+    "reference_equivalence": true,
+    "stable_resources": true,
+    "stable_worker_rss": true,
+    "task_arithmetic": true
+  },
+  "five_fold_epoch_equivalent_seconds": 82.46973133333334,
+  "fold_epochs": 15,
+  "maximum_worker_rss_growth_bytes": 6615040,
+  "median_sampled_gpu_utilization_percent": 14.0,
+  "minimum_available_ram_bytes": 26899877888,
+  "peak_sampled_vram_mib": 3238.0,
+  "projected_cv_100_epochs_hours": 2.2908258703703708,
+  "projected_one_model_100_epochs_minutes_range": [
+    39.71998342167353,
+    44.830510474954885
+  ],
+  "projected_six_weight_five_outer_hours": 68.72477611111113,
+  "projection_assumption": "Outer 3 two-worker, three-epoch mean wall time repeats across 100 epochs and all outer TRAIN studies; architecture, cache, and hardware remain fixed.",
+  "ready": true,
+  "resource_samples": 238,
+  "source_git_sha": "6dc1313f7715a3500d4c7213ce126dfe3f2bba3a",
+  "swap_growth_bytes": 0,
+  "training_seconds_by_epoch_sum": [
+    129.02504218596732,
+    111.18985335802427,
+    110.1818220410496
+  ],
+  "validation_seconds_by_epoch_sum": [
+    16.673661251028534,
+    15.90287096297834,
+    15.708047553023789
+  ],
+  "wall_seconds": 247.409194,
+  "warm_train_plus_validation_worker_seconds_per_five_folds": 126.491296957538
+}

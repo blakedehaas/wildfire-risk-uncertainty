@@ -10,7 +10,12 @@ import numpy as np
 import torch
 
 from wildfire_risk_uncertainty.training.data import inner_chunks, packed_batches
-from wildfire_risk_uncertainty.training.losses import loss_sums, streaming_batch_loss
+from wildfire_risk_uncertainty.training.losses import (
+    excess_log_losses,
+    loss_sums,
+    streaming_weighted_batch_loss,
+    target_entropy_sums,
+)
 from wildfire_risk_uncertainty.training.model import RiskMLP
 from wildfire_risk_uncertainty.training.preprocessing import (
     PreprocessingState,
@@ -66,23 +71,30 @@ def _batches(root: Path, state: PreprocessingState, role: str, epoch: int | None
 
 
 def _metrics(bp_sum: float, flp_sum: float, bp_count: int, flp_count: int,
-             seconds: float, steps: int) -> dict:
+             seconds: float, steps: int, alpha: float = 0.5) -> dict:
     if bp_count <= 0 or flp_count <= 0:
         raise ValueError("Both task supports must be nonempty")
-    return {"bp_loss": bp_sum / bp_count, "flp_loss": flp_sum / flp_count,
-            "combined_loss": 0.5 * (bp_sum / bp_count + flp_sum / flp_count),
+    combined = (0.5 * (bp_sum / bp_count + flp_sum / flp_count) if alpha == 0.5 else
+                alpha * bp_sum / bp_count + (1 - alpha) * flp_sum / flp_count)
+    result = {"bp_loss": bp_sum / bp_count, "flp_loss": flp_sum / flp_count,
+            "combined_loss": combined,
             "bp_loss_sum": bp_sum, "flp_loss_sum": flp_sum,
             "bp_rows": bp_count, "flp_valid_rows": flp_count, "optimizer_steps": steps,
             "wall_seconds": seconds, "rows_per_second": bp_count / seconds,
             "peak_vram_bytes": torch.cuda.max_memory_allocated(),
             "peak_reserved_vram_bytes": torch.cuda.max_memory_reserved(),
             "peak_rss_bytes": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024}
+    if alpha != 0.5:
+        result["alpha"] = alpha
+    return result
 
 
 def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
                 optimizer: torch.optim.AdamW, epoch: int, *, outer_study: int = 3,
                 inner_fold: int = 1, batch_size: int = BATCH_SIZE,
-                cache: "HpoCache | None" = None) -> dict:
+                cache: "HpoCache | None" = None, alpha: float = 0.5) -> dict:
+    if not 0 <= alpha <= 1:
+        raise ValueError("alpha must be within [0, 1]")
     model.train()
     torch.cuda.reset_peak_memory_stats()
     start = time.perf_counter()
@@ -96,7 +108,8 @@ def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
             if not torch.isfinite(bp_logits).all() or not torch.isfinite(flp_logits).all():
                 raise FloatingPointError("Nonfinite logits")
             bp_sum, flp_sum, n_bp, n_flp = loss_sums(bp_logits, flp_logits, bp, flp, valid)
-            loss = streaming_batch_loss(bp_sum, flp_sum, n_bp, state.rows, state.flp_valid_rows)
+            loss = streaming_weighted_batch_loss(bp_sum, flp_sum, n_bp,
+                                                 state.rows, state.flp_valid_rows, alpha)
         if not all(bool(torch.isfinite(x).item()) for x in (bp_sum, flp_sum, loss)):
             raise FloatingPointError("Nonfinite training loss")
         loss.backward()
@@ -114,19 +127,23 @@ def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
     torch.cuda.synchronize()
     if bp_rows != state.rows or flp_rows != state.flp_valid_rows:
         raise ValueError(f"Epoch {epoch} traversal/support mismatch: {bp_rows}/{flp_rows}")
-    return _metrics(bp_total, flp_total, bp_rows, flp_rows, time.perf_counter() - start, steps)
+    return _metrics(bp_total, flp_total, bp_rows, flp_rows, time.perf_counter() - start, steps, alpha)
 
 
 @torch.no_grad()
 def validate(root: Path, state: PreprocessingState, model: RiskMLP,
              expected_rows: int, expected_flp: int, *, outer_study: int = 3,
              inner_fold: int = 1, batch_size: int = BATCH_SIZE,
-             cache: "HpoCache | None" = None) -> dict:
+             cache: "HpoCache | None" = None, alpha: float = 0.5,
+             report_excess: bool = False) -> dict:
+    if not 0 <= alpha <= 1:
+        raise ValueError("alpha must be within [0, 1]")
     model.eval()
     torch.cuda.reset_peak_memory_stats()
     start = time.perf_counter()
     bp_total = flp_total = 0.0
     bp_rows = flp_rows = steps = 0
+    bp_entropy_total = flp_entropy_total = 0.0
     for raw in _batches(root, state, "validation", None, outer_study, inner_fold, batch_size, cache):
         features, bp, flp, valid = device_batch(raw, state)
         with torch.autocast("cuda", dtype=torch.bfloat16):
@@ -134,6 +151,10 @@ def validate(root: Path, state: PreprocessingState, model: RiskMLP,
             if not torch.isfinite(bp_logits).all() or not torch.isfinite(flp_logits).all():
                 raise FloatingPointError("Nonfinite validation logits")
             bp_sum, flp_sum, n_bp, n_flp = loss_sums(bp_logits, flp_logits, bp, flp, valid)
+            if report_excess:
+                bp_entropy, flp_entropy = target_entropy_sums(bp, flp, valid)
+                bp_entropy_total += float(bp_entropy.item())
+                flp_entropy_total += float(flp_entropy.item())
         if not bool(torch.isfinite(bp_sum).item()) or not bool(torch.isfinite(flp_sum).item()):
             raise FloatingPointError("Nonfinite validation loss")
         bp_total += float(bp_sum.item())
@@ -144,4 +165,13 @@ def validate(root: Path, state: PreprocessingState, model: RiskMLP,
     torch.cuda.synchronize()
     if bp_rows != expected_rows or flp_rows != expected_flp:
         raise ValueError(f"Validation traversal/support mismatch: {bp_rows}/{flp_rows}")
-    return _metrics(bp_total, flp_total, bp_rows, flp_rows, time.perf_counter() - start, steps)
+    result = _metrics(bp_total, flp_total, bp_rows, flp_rows,
+                      time.perf_counter() - start, steps, alpha)
+    if report_excess:
+        bp_kl, flp_kl = excess_log_losses(bp_total, flp_total,
+                                          bp_entropy_total, flp_entropy_total,
+                                          bp_rows, flp_rows)
+        result.update(bp_target_entropy_sum=bp_entropy_total,
+                      flp_target_entropy_sum=flp_entropy_total,
+                      bp_excess_log_loss=bp_kl, flp_excess_log_loss=flp_kl)
+    return result

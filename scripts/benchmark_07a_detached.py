@@ -1,4 +1,4 @@
-"""Detached, supervised full-epoch Phase 7A training calibration."""
+"""Detached, supervised Phase 7A calibration and Pareto experiments."""
 
 import argparse
 import csv
@@ -58,6 +58,13 @@ def write(path: Path, value: dict) -> None:
 
 def read(path: Path) -> dict:
     return json.loads(path.read_text())
+
+
+def clean_git_sha() -> str:
+    if subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT):
+        raise RuntimeError("Pareto execution requires a clean committed worktree")
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT,
+                                   text=True).strip()
 
 
 def pid_start(pid: int) -> str | None:
@@ -199,6 +206,14 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
     child_parent_death(parent_pid)
     config = read(path / "config.json")
     cpus = sorted(os.sched_getaffinity(0))
+    if config["kind"] == "pareto":
+        from wildfire_risk_uncertainty.training.phase7a_run import run_task
+
+        os.sched_setaffinity(0, cpus[fold % 2::2])
+        torch.set_num_threads(config["threads_each"])
+        torch.set_num_interop_threads(1)
+        run_task(ROOT, path, config, fold)
+        return
     if config["kind"] == "full_epoch":
         setup_start = time.perf_counter()
         os.sched_setaffinity(0, cpus[fold % 2::2])
@@ -312,21 +327,32 @@ def supervise(path: Path) -> None:
     signal.signal(signal.SIGINT, request_stop)
     config = read(path / "config.json")
     record = read(path / "status.json")
+    if record["state"] != "starting":
+        record.setdefault("attempt_history", []).append({
+            "state": record["state"], "started_at": record.get("started_at"),
+            "ended_at": record.get("ended_at"), "error": record.get("error"),
+            "supervisor_pid": record.get("supervisor_pid")})
+    completed = [fold for fold in config["folds"] if
+                 (artifact := path / f"fold_{fold}.json").exists() and
+                 not read(artifact).get("stopped_early", False)]
+    pending = [fold for fold in config["folds"] if fold not in completed]
     record.update(state="running", started_at=utc(), supervisor_pid=os.getpid(),
-                  supervisor_pid_start=pid_start(os.getpid()))
+                  supervisor_pid_start=pid_start(os.getpid()),
+                  completed_folds=completed, pending_folds=pending, error=None)
     write(path / "status.json", record)
     active: dict[int, subprocess.Popen] = {}
-    pending = list(config["folds"])
-    completed: list[int] = []
     failure = None
     max_vram = 0.0
-    samples = (path / "resource_samples.csv").open("w", newline="")
+    samples_path = path / "resource_samples.csv"
+    samples_new = not samples_path.exists()
+    samples = samples_path.open("a", newline="")
     columns = ["sampled_at", "elapsed_seconds", "active_folds", "worker_rss_bytes_sum",
                "worker_read_bytes_sum", "worker_major_faults_sum", "available_ram_bytes",
                "swap_used_bytes", "gpu_vram_used_mib", "gpu_utilization_percent",
                "gpu_memory_utilization_percent"]
     sample_writer = csv.DictWriter(samples, fieldnames=columns, lineterminator="\n")
-    sample_writer.writeheader()
+    if samples_new:
+        sample_writer.writeheader()
     start_time = time.monotonic()
     initial_swap = swap_used()
     try:
@@ -344,6 +370,9 @@ def supervise(path: Path) -> None:
                                             cwd=ROOT, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
                                             close_fds=True)
                 active[fold] = proc
+                if str(fold) in record.setdefault("workers", {}):
+                    record.setdefault("worker_attempt_history", {}).setdefault(str(fold), []).append(
+                        record["workers"][str(fold)])
                 record.setdefault("workers", {})[str(fold)] = {"pid": proc.pid, "pid_start": pid_start(proc.pid),
                                                               "started_at": utc(), "state": "running"}
                 record["pending_folds"] = pending
@@ -370,7 +399,7 @@ def supervise(path: Path) -> None:
                 terminate_children(active, record)
                 active.clear()
                 break
-            if config["kind"] == "full_epoch" and active:
+            if config["kind"] in {"full_epoch", "pareto"} and active:
                 gpu = gpu_snapshot()
                 used = gpu[0] if gpu is not None else None
                 ram = available_ram()
@@ -415,12 +444,13 @@ def supervise(path: Path) -> None:
 
 def launch(args) -> None:
     RUNS.mkdir(parents=True, exist_ok=True)
-    if args.kind == "full_epoch":
+    if args.kind in {"full_epoch", "pareto"}:
         if len(os.sched_getaffinity(0)) < 8 or not torch.cuda.is_available():
             raise RuntimeError("Two workers require at least eight accessible logical CPUs and CUDA")
         free, total = torch.cuda.mem_get_info()
         if total < 8 * 1024**3 or free < 8 * 1024**3 or available_ram() < 4 * 1024**3:
             raise RuntimeError("Insufficient GPU or guest RAM for validated two-worker calibration")
+    if args.kind == "full_epoch":
         config = dict(CONFIG)
         reference_path = RUNS / config["reference_run"]
         if read(reference_path / "status.json")["state"] != "complete" or any(
@@ -439,6 +469,32 @@ def launch(args) -> None:
                 "starting", "running", "stopping"
             }:
                 raise RuntimeError(f"Another full-epoch calibration is active: {previous.parent.name}")
+    elif args.kind == "pareto":
+        from wildfire_risk_uncertainty.training.phase7a_run import tasks_from_proposals
+
+        clean_git_sha()
+        probe_path = ROOT / "reports/training/07a/gradient_probe_cuda.json"
+        probe = read(probe_path)
+        if probe["model"]["device"] != "cuda" or probe["model"]["precision"] != "BF16":
+            raise ValueError("Pareto candidates require the production CUDA BF16 gradient probe")
+        for name, digest in probe["source_files_sha256"].items():
+            if hashlib.sha256((ROOT / name).read_bytes()).hexdigest() != digest:
+                raise ValueError(f"Gradient probe source changed since candidate generation: {name}")
+        tasks = tasks_from_proposals(probe["proposals"])
+        if len(tasks) != 150:
+            raise ValueError("Expected six weights × five inner folds × five outer studies")
+        model_configuration = {"depth": 3, "width": 128, "batch_size": 65536,
+                               "learning_rate": 0.001, "weight_decay": 0.000316227766}
+        config = {**CONFIG, "kind": "pareto", "folds": list(range(1, 151)),
+                  "tasks": tasks, "proposals": probe["proposals"],
+                  "probe_path": str(probe_path.relative_to(ROOT)),
+                  "probe_sha256": hashlib.sha256(probe_path.read_bytes()).hexdigest(),
+                  "model_configuration": model_configuration, "max_epochs": 100}
+        for previous in RUNS.glob("07a-*/config.json"):
+            if read(previous).get("kind") == "pareto" and status(previous.parent)["state"] in {
+                "starting", "running", "stopping"
+            }:
+                raise RuntimeError(f"Another Pareto run is active: {previous.parent.name}")
     else:
         config = {"kind": "smoke", "folds": [1], "processes": 1,
                   "smoke_seconds": args.smoke_seconds}
@@ -469,13 +525,52 @@ def launch(args) -> None:
     raise TimeoutError(f"Supervisor did not become ready: {path}")
 
 
+def resume(experiment_id: str) -> None:
+    path = run_dir(experiment_id)
+    config = read(path / "config.json")
+    current = status(path)
+    if config["kind"] != "pareto" or current["state"] not in {"stopped", "failed"}:
+        raise RuntimeError("Only a stopped or failed Pareto experiment can resume")
+    if clean_git_sha() != config["source_git_sha"]:
+        raise RuntimeError("Pareto resume requires the original committed source revision")
+    if (len(os.sched_getaffinity(0)) < 8 or available_ram() < 4 * 1024**3 or
+            not torch.cuda.is_available() or torch.cuda.mem_get_info()[0] < 8 * 1024**3):
+        raise RuntimeError("Validated CPU, guest RAM, and GPU access are required to resume")
+    if any(read(previous).get("kind") == "pareto" and status(previous.parent)["state"] in {
+        "starting", "running", "stopping"
+    } for previous in RUNS.glob("07a-*/config.json") if previous.parent != path):
+        raise RuntimeError("Another Pareto experiment is active")
+    (path / "stop.request.json").unlink(missing_ok=True)
+    for task in config["tasks"]:
+        artifact = path / f"fold_{task['id']}.json"
+        if not artifact.exists() or read(artifact).get("stopped_early", False):
+            (path / f"fold_{task['id']}.ready.json").unlink(missing_ok=True)
+    with (path / "supervisor.stdout.log").open("a") as out, (path / "supervisor.stderr.log").open("a") as err:
+        proc = subprocess.Popen([sys.executable, __file__, "_supervise", experiment_id], cwd=ROOT,
+                                stdin=subprocess.DEVNULL, stdout=out, stderr=err,
+                                start_new_session=True, close_fds=True)
+    for _ in range(100):
+        now = status(path)
+        if now["state"] == "running" and now.get("supervisor_pid") == proc.pid and any(
+            (path / f"fold_{task['id']}.ready.json").exists() for task in config["tasks"]
+            if task["id"] not in now["completed_folds"]
+        ):
+            print(json.dumps({"experiment_id": experiment_id, "state": "running",
+                              "supervisor_pid": proc.pid, "run_dir": str(path)}))
+            return
+        if now["state"] == "failed" or proc.poll() is not None:
+            raise RuntimeError(f"Resumed supervisor failed: {path / 'supervisor.stderr.log'}")
+        time.sleep(0.1)
+    raise TimeoutError(f"Resumed supervisor did not become ready: {path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     start = sub.add_parser("launch")
-    start.add_argument("--kind", choices=["full_epoch", "smoke"], default="full_epoch")
+    start.add_argument("--kind", choices=["full_epoch", "pareto", "smoke"], default="full_epoch")
     start.add_argument("--smoke-seconds", type=int, default=30)
-    for name in ("status", "results", "stop", "_supervise"):
+    for name in ("status", "results", "analyze", "resume", "stop", "_supervise"):
         sub.add_parser(name).add_argument("experiment_id")
     internal = sub.add_parser("_worker")
     internal.add_argument("experiment_id")
@@ -493,7 +588,17 @@ def main() -> None:
     elif args.command == "results":
         path = run_dir(args.experiment_id)
         print(json.dumps({"status": status(path), "artifacts": {
-            p.stem: read(p) for p in path.glob("fold_[0-9].json")}}, indent=2))
+            p.stem: read(p) for p in path.glob("fold_*.json")
+            if p.stem.removeprefix("fold_").isdigit()}}, indent=2))
+    elif args.command == "analyze":
+        from wildfire_risk_uncertainty.training.phase7a_run import analyze
+
+        path = run_dir(args.experiment_id)
+        if status(path)["state"] != "complete":
+            raise RuntimeError("Pareto analysis requires a complete detached run")
+        print(json.dumps(analyze(path), indent=2))
+    elif args.command == "resume":
+        resume(args.experiment_id)
     else:
         path = run_dir(args.experiment_id)
         current = status(path)
