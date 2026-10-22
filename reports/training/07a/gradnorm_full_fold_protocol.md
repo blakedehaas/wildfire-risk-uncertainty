@@ -49,6 +49,9 @@ remain active. A clean committed worktree is required at launch and resume.
 .venv/bin/python scripts/benchmark_07a_detached.py resume EXPERIMENT_ID
 ```
 
-Only the launch readiness check should be run in the launching Codex session.
-Interpret the completed 100-epoch metrics in a later session, without changing
-the method based on incomplete trajectories.
+The historical run `07a-20261022T054112Z-5270cc63` has completed and was
+recovered after a post-epoch-100 finalization error; see the
+[full-fidelity review](gradnorm_full_fold_review.md). The launch command above
+documents the original reproducible protocol and is **not** a request to run
+another experiment. Phase 7B begins with read-only evaluation of existing
+checkpoints.

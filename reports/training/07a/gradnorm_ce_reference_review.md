@@ -1,5 +1,12 @@
 # CE-rate GradNorm bounded validation, 2026-10-22
 
+**Historical three-epoch decision point.** Its hold on full-fidelity training
+was followed by the approved and completed
+[100-epoch continuation](gradnorm_full_fold_review.md). The HPO ranking and BP
+geographic predictive-adequacy questions remain open in
+[Phase 7B](../../../docs/methodology/checkpoint_07b_model_selection.md). The
+three-epoch measurements and contemporary interpretation below are preserved.
+
 ## Method and provenance
 
 This revision uses each task's existing masked cross entropy for both the model update and GradNorm's relative training-rate measurement. The first complete inner-TRAIN epoch uses weights `(1, 1)`. Its exact BP and FLP separate-support mean training cross entropies become fixed references; adaptive weight updates start in epoch 2. This follows the scheduling and first-epoch loss-buffer convention of [pinned LibMTL GradNorm](https://github.com/median-research-group/LibMTL/blob/4336804847eaa5e0b924b743d76beec7ac3fdc97/LibMTL/weighting/GradNorm.py), with the same detached-target equations as [Chen et al. (2018), Algorithm 1](https://proceedings.mlr.press/v80/chen18a/chen18a.pdf). The existing separate Adam optimizer at learning rate 0.025, direct positive projection, sum-to-two normalization, network AdamW, and frozen global FLP-support correction remain. LibMTL's softmax parameterization and common optimizer are documented differences.
