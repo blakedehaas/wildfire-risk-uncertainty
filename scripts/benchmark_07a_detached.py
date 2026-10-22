@@ -660,6 +660,41 @@ def resume(experiment_id: str) -> None:
     raise TimeoutError(f"Resumed supervisor did not become ready: {path}")
 
 
+def finalize_full_fold(experiment_id: str) -> None:
+    """Reconcile a completed trajectory after a post-epoch finalizer failure."""
+    from gradnorm_full_fold import verify_complete_artifacts
+
+    path = run_dir(experiment_id)
+    config = read(path / "config.json")
+    record = status(path)
+    if (config["kind"] != "gradnorm_full_fold" or record["state"] != "failed" or
+            record["workers"]["1"]["state"] != "failed" or
+            pid_start(record["workers"]["1"]["pid"]) ==
+            record["workers"]["1"]["pid_start"]):
+        raise RuntimeError("Only a finished, failed full-fold worker can be finalized")
+    summary = verify_complete_artifacts(path, config)
+    summary_path = path / "fold_1.json"
+    if summary_path.exists():
+        saved = read(summary_path)
+        if any(saved[key] != summary[key] for key in (
+                "completed_epoch", "stopped_early", "epoch_records", "final_global_step")):
+            raise ValueError("Existing fold summary differs from verified artifacts")
+    else:
+        write(summary_path, summary)
+    record["recovery"] = {"recovered_at": utc(), "previous_state": record["state"],
+                          "previous_error": record["error"],
+                          "worker_exit_code": record["workers"]["1"]["exit_code"],
+                          "reason": "All 100 epochs verified; original finalizer included checksum sidecars"}
+    record["state"] = "complete"
+    record["error"] = None
+    record["completed_folds"] = [1]
+    record["workers"]["1"]["state"] = "recovered_complete"
+    write(path / "status.json", record)
+    print(json.dumps({"experiment_id": experiment_id, "state": "complete",
+                      "run_dir": str(path), "verified_checkpoint_count": summary[
+                          "verified_checkpoint_count"]}))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -670,7 +705,7 @@ def main() -> None:
     start.add_argument("--outer-study", type=int, choices=range(1, 6))
     start.add_argument("--gradnorm-objective-reviewed", action="store_true")
     start.add_argument("--smoke-seconds", type=int, default=30)
-    for name in ("status", "results", "analyze", "resume", "stop", "_supervise"):
+    for name in ("status", "results", "analyze", "resume", "stop", "finalize", "_supervise"):
         sub.add_parser(name).add_argument("experiment_id")
     internal = sub.add_parser("_worker")
     internal.add_argument("experiment_id")
@@ -688,9 +723,11 @@ def main() -> None:
     elif args.command == "results":
         path = run_dir(args.experiment_id)
         if read(path / "config.json")["kind"] == "gradnorm_full_fold":
-            epochs = sorted(path.glob("fold_1_epoch_*.json"))
+            from gradnorm_full_fold import epoch_records
+
+            epochs = epoch_records(path)
             print(json.dumps({"status": status(path), "completed_epoch_records": len(epochs),
-                              "latest_epoch": read(epochs[-1]) if epochs else None,
+                              "latest_epoch": read(epochs[-1][1]) if epochs else None,
                               "artifact_dir": str(path)}, indent=2))
         else:
             print(json.dumps({"status": status(path), "artifacts": {
@@ -705,6 +742,8 @@ def main() -> None:
         print(json.dumps(analyze(path), indent=2))
     elif args.command == "resume":
         resume(args.experiment_id)
+    elif args.command == "finalize":
+        finalize_full_fold(args.experiment_id)
     else:
         path = run_dir(args.experiment_id)
         current = status(path)

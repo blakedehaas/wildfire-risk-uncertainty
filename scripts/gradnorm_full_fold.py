@@ -6,6 +6,7 @@ import json
 import math
 import os
 import random
+import re
 import time
 from pathlib import Path
 
@@ -66,6 +67,115 @@ def write(path: Path, value: dict) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_bytes(stable_json_bytes(value))
     temporary.replace(path)
+
+
+def epoch_records(path: Path) -> list[tuple[int, Path]]:
+    """Select only epoch metric records, never checkpoint checksum sidecars."""
+    records = []
+    seen = set()
+    for item in path.iterdir():
+        match = re.fullmatch(r"fold_1_epoch_([0-9]+)\.json", item.name)
+        if match is None:
+            continue
+        epoch = int(match.group(1))
+        if epoch in seen:
+            raise ValueError(f"Duplicate metric records for epoch {epoch}")
+        seen.add(epoch)
+        records.append((epoch, item))
+    return sorted(records)
+
+
+def finite_numbers(value: object) -> bool:
+    if isinstance(value, dict):
+        return all(finite_numbers(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return all(finite_numbers(item) for item in value)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return math.isfinite(value)
+    return True
+
+
+def verify_complete_artifacts(path: Path, config: dict) -> dict:
+    """Verify the finished 100-epoch trajectory without executing training."""
+    if config["kind"] != "gradnorm_full_fold" or config["folds"] != [1] or config["epochs"] != 100:
+        raise ValueError("Not the fixed 100-epoch inner-fold experiment")
+    provenance = json.loads((path / "source_epochs_001_to_003.json").read_text())
+    if (provenance["source_result"] != str(SOURCE.relative_to(ROOT)) or
+            provenance["source_result_sha256"] != sha256(SOURCE) or
+            provenance["epochs"] != json.loads(SOURCE.read_text())["epochs"]):
+        raise ValueError("First-three-epoch provenance differs")
+    if [item["epoch"] for item in provenance["epochs"]] != [1, 2, 3]:
+        raise ValueError("First three epochs are incomplete")
+    for item in provenance["epochs"]:
+        if (not finite_numbers(item) or item["validation"]["bp_rows"] <= 0 or
+                item["validation"]["flp_valid_rows"] <= 0):
+            raise ValueError(f"Original epoch {item['epoch']} metrics are invalid")
+        checkpoint = ROOT / item["checkpoint"]
+        if (not item["checkpoint_restored_exactly"] or
+                sha256(checkpoint) != item["checkpoint_sha256"] or
+                sha256(checkpoint) != json.loads(checkpoint.with_suffix(
+                    ".pt.sha256.json").read_text())["sha256"]):
+            raise ValueError(f"Original epoch {item['epoch']} checkpoint differs")
+    records = epoch_records(path)
+    if [epoch for epoch, _ in records] != list(range(4, 101)):
+        raise ValueError("Epoch 4–100 metric records are incomplete")
+    expected_step = config["continuation"]["source_global_step"]
+    metadata = None
+    for epoch, metric_path in records:
+        item = json.loads(metric_path.read_text())
+        if not finite_numbers(item):
+            raise ValueError(f"Epoch {epoch} contains nonfinite metrics")
+        expected_step += item["training"]["optimizer_steps"]
+        checkpoint = path / f"fold_1_epoch_{epoch:03d}.pt"
+        if (item["epoch"] != epoch or item["global_step"] != expected_step or
+                item["checkpoint"] != checkpoint.name or not item["checkpoint_restored"]):
+            raise ValueError(f"Epoch {epoch} metric/checkpoint linkage differs")
+        if (item["validation"]["bp_rows"] != item["bp_diagnostics"]["overall"]["rows"] or
+                item["validation"]["flp_valid_rows"] <= 0 or
+                sum(stratum["rows"] for stratum in item["bp_diagnostics"]["strata"]) !=
+                item["validation"]["bp_rows"] or
+                abs(item["validation"]["bp_excess_log_loss"] -
+                    item["bp_diagnostics"]["overall"]["excess_log_loss"]) > 1e-4):
+            raise ValueError(f"Epoch {epoch} validation support or BP loss differs")
+        if not all(math.isfinite(item["validation"][name]) for name in (
+                "bp_excess_log_loss", "flp_excess_log_loss", "bp_loss", "flp_loss")):
+            raise ValueError(f"Epoch {epoch} validation metric is nonfinite")
+        actual_hash = sha256(checkpoint)
+        sidecar_hash = json.loads(checkpoint.with_suffix(".pt.sha256.json").read_text())["sha256"]
+        if actual_hash != item["checkpoint_sha256"] or actual_hash != sidecar_hash:
+            raise ValueError(f"Epoch {epoch} checkpoint checksum differs")
+        saved = torch.load(checkpoint, map_location="cpu", weights_only=False)
+        required_state = ("model_state", "optimizer_state", "gradnorm_state",
+                          "gradnorm_optimizer_state", "python_rng_state", "numpy_rng_state",
+                          "torch_cpu_rng_state", "torch_cuda_rng_state")
+        if (saved["completed_epoch"] != epoch or saved["global_step"] != expected_step or
+                any(saved.get(key) is None for key in required_state)):
+            raise ValueError(f"Epoch {epoch} checkpoint state is incomplete")
+        if metadata is None:
+            metadata = saved["metadata"]
+        elif saved["metadata"] != metadata:
+            raise ValueError(f"Epoch {epoch} checkpoint metadata differs")
+    if metadata["source_git_sha"] != config["source_git_sha"] or metadata[
+            "source_checkpoint_sha256"] != config["continuation"]["source_checkpoint_sha256"]:
+        raise ValueError("Checkpoint provenance differs from experiment configuration")
+    cache = HpoCache(ROOT, ROOT / "artifacts/training/hpo_cache_v1", check_files=False)
+    state = load_states(ROOT, cache, 3)[1]
+    seed_everything(42)
+    model, optimizer = make_model(33, 3, 128, 0.001, 0.000316227766)
+    gradnorm = GradNorm("cuda")
+    final_epoch, final_step = load_cache_checkpoint(
+        path / "fold_1_epoch_100.pt", model, optimizer, cache=cache, state=state,
+        expected_metadata={key: value for key, value in metadata.items() if key != "cache_binding"},
+        gradnorm=gradnorm)
+    if (final_epoch, final_step) != (100, expected_step):
+        raise ValueError("Final checkpoint cannot restore the completed trajectory")
+    return {"fold": 1, "completed_epoch": 100, "stopped_early": False,
+            "epoch_records": [item.name for _, item in records],
+            "continuation": config["continuation"],
+            "finished_at": json.loads(records[-1][1].read_text())["finished_at"],
+            "recovered_at": time.time(), "recovered_after_finalization_failure": True,
+            "verified_checkpoint_count": len(records) + 3,
+            "final_global_step": final_step}
 
 
 def source_compatibility(config: dict) -> dict:
@@ -284,9 +394,9 @@ def run(path: Path, config: dict, progress) -> None:
                 "configuration": {key: config[key] for key in (
                     "depth", "width", "batch_size", "learning_rate", "weight_decay", "seed")},
                 "gradnorm_rate_version": "ce-first-epoch-v2"}
-    existing = sorted(path.glob("fold_1_epoch_*.json"))
+    existing = epoch_records(path)
     if existing:
-        latest = json.loads(existing[-1].read_text())
+        latest = json.loads(existing[-1][1].read_text())
         epoch, step = load_cache_checkpoint(path / latest["checkpoint"], model, optimizer,
                                             cache=cache, state=state, expected_metadata=metadata,
                                             gradnorm=gradnorm)
@@ -405,10 +515,10 @@ def run(path: Path, config: dict, progress) -> None:
                       "VmRSS:", 1)[1].split()[0]) * 1024}
         write(path / f"fold_1_epoch_{epoch:03d}.json", record)
         progress(path, 1, epoch, "complete")
-    records = sorted(path.glob("fold_1_epoch_*.json"))
-    completed = int(records[-1].stem.rsplit("_", 1)[1]) if records else 3
+    records = epoch_records(path)
+    completed = records[-1][0] if records else 3
     write(path / "fold_1.json", {"fold": 1, "completed_epoch": completed,
                                   "stopped_early": completed < 100,
-                                  "epoch_records": [item.name for item in records],
+                                  "epoch_records": [item.name for _, item in records],
                                   "continuation": config["continuation"],
                                   "finished_at": time.time()})

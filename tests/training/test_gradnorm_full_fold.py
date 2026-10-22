@@ -4,6 +4,7 @@ import importlib.util
 import math
 from pathlib import Path
 
+import pytest
 import torch
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts/gradnorm_full_fold.py"
@@ -49,3 +50,15 @@ def test_climatology_skill_uses_same_soft_target_support_and_entropy():
     assert math.isclose(result["climatology_excess_log_loss"], expected_base_kl)
     assert math.isclose(result["excess_log_loss_skill_vs_climatology"],
                         expected_base_kl - result["excess_log_loss"])
+
+
+def test_epoch_record_discovery_excludes_checkpoint_sidecars_and_sorts_numerically(tmp_path):
+    module = load_module()
+    for epoch in (9, 100, 99):
+        (tmp_path / f"fold_1_epoch_{epoch:03d}.json").write_text("{}")
+        (tmp_path / f"fold_1_epoch_{epoch:03d}.pt").write_text("checkpoint")
+        (tmp_path / f"fold_1_epoch_{epoch:03d}.pt.sha256.json").write_text("{}")
+    assert [epoch for epoch, _ in module.epoch_records(tmp_path)] == [9, 99, 100]
+    (tmp_path / "fold_1_epoch_99.json").write_text("{}")
+    with pytest.raises(ValueError, match="Duplicate metric records for epoch 99"):
+        module.epoch_records(tmp_path)
