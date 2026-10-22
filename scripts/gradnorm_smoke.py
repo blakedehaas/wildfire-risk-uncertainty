@@ -13,7 +13,7 @@ import torch
 
 from wildfire_risk_uncertainty.training.cache import HpoCache
 from wildfire_risk_uncertainty.training.cache_states import load_states
-from wildfire_risk_uncertainty.training.gradnorm import GradNorm, soft_target_kl
+from wildfire_risk_uncertainty.training.gradnorm import GradNorm
 from wildfire_risk_uncertainty.training.losses import loss_sums
 from wildfire_risk_uncertainty.training.preprocessing import stable_json_bytes
 from wildfire_risk_uncertainty.training.trainer import (
@@ -64,7 +64,8 @@ def main() -> None:
             bp_sum, flp_sum, n_bp, n_flp = loss_sums(bp_logits, flp_logits, bp, flp, valid)
         flp_loss = flp_sum * (state.rows / state.flp_valid_rows) / n_bp if n_flp else None
         result = gradnorm.step(model, optimizer, bp_sum / n_bp, flp_loss,
-                               soft_target_kl(bp_logits, flp_logits, bp, flp, valid))
+                               (float(bp_sum.detach()) / n_bp,
+                                float(flp_sum.detach()) / n_flp if n_flp else None))
         torch.cuda.synchronize()
         times.append({"preprocess_transfer_seconds": prep_seconds,
                       "gradnorm_network_step_seconds": time.perf_counter() - step_start})

@@ -13,7 +13,10 @@ from typing import Self
 import numpy as np
 import torch
 
-from wildfire_risk_uncertainty.hpo.config import Configuration
+from wildfire_risk_uncertainty.hpo.config import (
+    GRADNORM_TRAINING_VERSION,
+    Configuration,
+)
 from wildfire_risk_uncertainty.hpo.real import support_counts
 from wildfire_risk_uncertainty.training.cache import HpoCache
 from wildfire_risk_uncertainty.training.cache_checkpoint import (
@@ -153,7 +156,8 @@ def _worker(
                                 "inner_fold": fold,
                                 "configuration": configuration.serializable(),
                                 "seed": 42,
-                                **({"loss_balancing": "gradnorm", "gradnorm_alpha": 1.5}
+                                **({"loss_balancing": "gradnorm", "gradnorm_alpha": 1.5,
+                                    "gradnorm_training_version": GRADNORM_TRAINING_VERSION}
                                    if gradnorm is not None else {}),
                             },
                             gradnorm=gradnorm,
@@ -224,7 +228,8 @@ def _worker(
                             "inner_fold": fold,
                             "configuration": configuration.serializable(),
                             "seed": 42,
-                            **({"loss_balancing": "gradnorm", "gradnorm_alpha": 1.5}
+                            **({"loss_balancing": "gradnorm", "gradnorm_alpha": 1.5,
+                                "gradnorm_training_version": GRADNORM_TRAINING_VERSION}
                                if gradnorm is not None else {}),
                         },
                         gradnorm=gradnorm,

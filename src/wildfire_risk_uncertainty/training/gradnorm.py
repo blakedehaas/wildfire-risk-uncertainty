@@ -20,7 +20,7 @@ def soft_target_kl(
     flp_target: torch.Tensor,
     flp_valid: torch.Tensor,
 ) -> tuple[float, float | None]:
-    """Stable KL rates in float64; prediction gradients still use cross entropy."""
+    """Independent soft-target KL diagnostic; GradNorm rates use cross entropy."""
     p = bp_target.double()
     z = bp_logits.double()
     bp_ce = -(p * F.logsigmoid(z) + (1 - p) * F.logsigmoid(-z)).mean()
@@ -61,7 +61,7 @@ class GradNorm(nn.Module):
     """Paper Algorithm 1 with separate Adam updates and positive simplex projection.
 
     The selected W is the weight matrix of the final shared backbone Linear.
-    First references are pre-update KL values of the first batch with FLP support.
+    First references are separate-support mean CE losses over the first epoch.
     """
 
     def __init__(self, device: torch.device | str, *, alpha: float = GRADNORM_ALPHA,
@@ -71,9 +71,20 @@ class GradNorm(nn.Module):
             raise ValueError("GradNorm alpha and learning rate must be positive")
         self.alpha = alpha
         self.weights = nn.Parameter(torch.ones(2, device=device, dtype=torch.float32))
-        self.register_buffer("initial_kl", torch.zeros(2, device=device, dtype=torch.float64))
+        self.register_buffer("initial_ce", torch.zeros(2, device=device, dtype=torch.float64))
         self.register_buffer("initialized", torch.tensor(False, device=device))
         self.optimizer = torch.optim.Adam([self.weights], lr=learning_rate)
+
+    @torch.no_grad()
+    def initialize_from_epoch(self, bp_ce: float, flp_ce: float) -> None:
+        """Set LibMTL-style first-epoch references after equal-weight training."""
+        if bool(self.initialized) or self.optimizer.state:
+            raise ValueError("GradNorm CE references are already initialized")
+        initial = torch.tensor([bp_ce, flp_ce], device=self.weights.device, dtype=torch.float64)
+        if not bool(torch.isfinite(initial).all()) or not bool((initial > 0).all()):
+            raise ValueError("First-epoch CE references must be finite and positive")
+        self.initial_ce.copy_(initial)
+        self.initialized.fill_(True)
 
     @torch.no_grad()
     def _project(self) -> None:
@@ -83,29 +94,26 @@ class GradNorm(nn.Module):
 
     def step(self, model: RiskMLP, model_optimizer: torch.optim.Optimizer,
              bp_loss: torch.Tensor, flp_loss: torch.Tensor | None,
-             kl: tuple[float, float | None]) -> dict:
+             rate_ce: tuple[float, float | None]) -> dict:
         """Update network with old weights and weight parameters with L_grad."""
         model_optimizer.zero_grad(set_to_none=True)
         self.optimizer.zero_grad(set_to_none=True)
         before = self.weights.detach().clone()
         diagnostics = {"bp_weight": float(before[0]), "flp_weight": float(before[1]),
-                       "bp_kl_rate": kl[0], "flp_kl_rate": kl[1],
+                       "bp_ce_rate_loss": rate_ce[0], "flp_ce_rate_loss": rate_ce[1],
                        "bp_shared_gradient_norm": None, "flp_shared_gradient_norm": None,
                        "bp_relative_rate": None, "flp_relative_rate": None,
                        "gradnorm_objective": None, "gradnorm_weight_updated": False}
+        if not math.isfinite(rate_ce[0]) or rate_ce[0] <= 0:
+            raise FloatingPointError("Invalid BP CE rate loss")
         if flp_loss is not None:
-            if kl[1] is None:
-                raise ValueError("FLP loss and KL support disagree")
-            observed = torch.tensor(kl, device=self.weights.device, dtype=torch.float64)
-            if not bool(torch.isfinite(observed).all()) or bool((observed < 0).any()):
-                raise FloatingPointError("Invalid GradNorm KL rates")
-            if not bool(self.initialized):
-                if not bool((observed > 0).all()):
-                    raise ValueError("First-step KL references must be positive for GradNorm")
-                self.initial_kl.copy_(observed)
-                self.initialized.fill_(True)
-            if bool(observed.sum() > 0):
-                rates = (observed / self.initial_kl).float()
+            if rate_ce[1] is None:
+                raise ValueError("FLP loss and CE support disagree")
+            observed = torch.tensor(rate_ce, device=self.weights.device, dtype=torch.float64)
+            if not bool(torch.isfinite(observed).all()) or not bool((observed > 0).all()):
+                raise FloatingPointError("Invalid GradNorm CE rate losses")
+            if bool(self.initialized):
+                rates = (observed / self.initial_ce).float()
                 shared_weight = model.backbone[-2].weight
                 bp_grad = torch.autograd.grad(bp_loss, shared_weight, retain_graph=True)[0]
                 flp_grad = torch.autograd.grad(flp_loss, shared_weight, retain_graph=True)[0]
@@ -122,6 +130,8 @@ class GradNorm(nn.Module):
                                    gradnorm_objective=float(objective.detach()),
                                    gradnorm_weight_updated=True)
             network_loss = before[0] * bp_loss + before[1] * flp_loss
+        elif rate_ce[1] is not None:
+            raise ValueError("FLP loss and CE support disagree")
         else:
             # No FLP target: keep both weights and its optimizer state unchanged.
             network_loss = before[0] * bp_loss

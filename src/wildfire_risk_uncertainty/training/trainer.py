@@ -99,6 +99,8 @@ def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
         raise ValueError("alpha must be within [0, 1]")
     if gradnorm is not None and alpha != 0.5:
         raise ValueError("Static alpha cannot be combined with GradNorm")
+    if gradnorm is not None and bool(gradnorm.initialized) != (epoch > 1):
+        raise ValueError("GradNorm CE reference state does not match epoch")
     model.train()
     torch.cuda.reset_peak_memory_stats()
     start = time.perf_counter()
@@ -131,12 +133,11 @@ def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
             if not all(bool(torch.isfinite(p).all().item()) for p in model.parameters()):
                 raise FloatingPointError("Nonfinite parameter after optimizer step")
         else:
-            from wildfire_risk_uncertainty.training.gradnorm import soft_target_kl
-
             bp_loss = bp_sum / n_bp
             flp_loss = flp_sum * (state.rows / state.flp_valid_rows) / n_bp if n_flp else None
-            kl = soft_target_kl(bp_logits, flp_logits, bp, flp, valid)
-            gradnorm_records.append(gradnorm.step(model, optimizer, bp_loss, flp_loss, kl))
+            rate_ce = (float(bp_loss.detach()),
+                       float((flp_sum / n_flp).detach()) if n_flp else None)
+            gradnorm_records.append(gradnorm.step(model, optimizer, bp_loss, flp_loss, rate_ce))
         bp_total += float(bp_sum.item())
         flp_total += float(flp_sum.item())
         bp_rows += n_bp
@@ -148,15 +149,15 @@ def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
     result = _metrics(bp_total, flp_total, bp_rows, flp_rows,
                       time.perf_counter() - start, steps, alpha)
     if gradnorm is not None:
+        if epoch == 1:
+            gradnorm.initialize_from_epoch(result["bp_loss"], result["flp_loss"])
         active = [item for item in gradnorm_records if item["gradnorm_weight_updated"]]
         result["gradnorm"] = {
             "method": "GradNorm", "alpha": gradnorm.alpha,
-            "first_step_initial_kl": gradnorm.initial_kl.detach().cpu().tolist(),
+            "first_epoch_initial_ce": gradnorm.initial_ce.detach().cpu().tolist(),
             "updates": len(active),
-            "bp_only_steps": sum(item["flp_kl_rate"] is None for item in gradnorm_records),
-            "undefined_joint_rate_steps": sum(item["flp_kl_rate"] is not None and
-                                                not item["gradnorm_weight_updated"]
-                                                for item in gradnorm_records),
+            "equal_weight_steps": steps - len(active) if epoch == 1 else 0,
+            "bp_only_steps": sum(item["flp_ce_rate_loss"] is None for item in gradnorm_records),
             "bp_weight_final": float(gradnorm.weights[0].detach()),
             "flp_weight_final": float(gradnorm.weights[1].detach()),
             **{key + "_mean": sum(item[key] for item in active) / len(active) if active else None

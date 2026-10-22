@@ -42,7 +42,7 @@ def test_published_equations_with_detached_targets():
     assert weights.grad.tolist() == pytest.approx([0.4, -1.2])
     assert base.grad is None and rates.grad is None
     assert study_name(3) == "wildfire_outer_3_hpo_v1"
-    assert study_name(3, gradnorm=True) == "wildfire_outer_3_gradnorm_hpo_v1"
+    assert study_name(3, gradnorm=True) == "wildfire_outer_3_gradnorm_hpo_v2"
     with pytest.raises(ValueError, match="rates"):
         gradnorm_equations(torch.ones(2), torch.ones(2), torch.zeros(2))
 
@@ -92,10 +92,9 @@ def test_no_flp_batch_keeps_weights_and_weight_optimizer_unchanged():
     valid = torch.zeros(4, dtype=torch.bool)
     bs, fs, _, nf = loss_sums(bp_logits, flp_logits, bp, flp, valid)
     assert nf == 0 and fs.item() == 0
-    kl = soft_target_kl(bp_logits, flp_logits, bp, flp, valid)
-    assert kl[1] is None
+    rate_ce = (float(bs.detach()) / 4, None)
     before = [p.detach().clone() for p in model.parameters()]
-    result = gradnorm.step(model, optimizer, bs / 4, None, kl)
+    result = gradnorm.step(model, optimizer, bs / 4, None, rate_ce)
     assert result["gradnorm_weight_updated"] is False
     assert gradnorm.weights.tolist() == [1.0, 1.0]
     assert not gradnorm.optimizer.state
@@ -105,9 +104,11 @@ def test_no_flp_batch_keeps_weights_and_weight_optimizer_unchanged():
     valid_next = torch.ones(4, dtype=torch.bool)
     flp_next = F.softmax(torch.randn(4, 6), dim=-1)
     bs_next, fs_next, _, nf_next = loss_sums(next_bp, next_flp, bp, flp_next, valid_next)
-    gradnorm.step(model, optimizer, bs_next / 4, fs_next / nf_next,
-                  soft_target_kl(next_bp, next_flp, bp, flp_next, valid_next))
-    assert bool(gradnorm.initialized) and bool((gradnorm.initial_kl > 0).all())
+    warmup = gradnorm.step(model, optimizer, bs_next / 4, fs_next / nf_next,
+                           (float(bs_next.detach()) / 4, float(fs_next.detach()) / nf_next))
+    assert not warmup["gradnorm_weight_updated"] and not bool(gradnorm.initialized)
+    gradnorm.initialize_from_epoch(0.5, 1.0)
+    assert bool(gradnorm.initialized) and gradnorm.initial_ce.tolist() == [0.5, 1.0]
 
 
 def test_weight_objective_cannot_update_network_parameters():
@@ -118,6 +119,7 @@ def test_weight_objective_cannot_update_network_parameters():
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
     reference_optimizer = torch.optim.AdamW(reference.parameters(), lr=0.001)
     gradnorm = GradNorm("cpu")
+    gradnorm.initialize_from_epoch(0.7, 1.8)
     x = torch.randn(10, 3)
     bp = torch.rand(10)
     flp = F.softmax(torch.randn(10, 6), dim=-1)
@@ -125,7 +127,7 @@ def test_weight_objective_cannot_update_network_parameters():
     bp_logits, flp_logits = model(x)
     bs, fs, nb, nf = loss_sums(bp_logits, flp_logits, bp, flp, valid)
     gradnorm.step(model, optimizer, bs / nb, fs / nf,
-                  soft_target_kl(bp_logits, flp_logits, bp, flp, valid))
+                  (float(bs.detach()) / nb, float(fs.detach()) / nf))
     ref_bp, ref_flp = reference(x)
     ref_bs, ref_fs, _, _ = loss_sums(ref_bp, ref_flp, bp, flp, valid)
     reference_optimizer.zero_grad(set_to_none=True)
@@ -136,12 +138,48 @@ def test_weight_objective_cannot_update_network_parameters():
     assert gradnorm.weights.grad is not None
 
 
+def test_relative_rates_use_epoch_ce_references():
+    torch.manual_seed(4)
+    model = RiskMLP(3, depth=2, width=8)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
+    gradnorm = GradNorm("cpu")
+    gradnorm.initialize_from_epoch(0.5, 2.0)
+    x = torch.randn(8, 3)
+    bp = torch.full((8,), 0.2)
+    flp = F.softmax(torch.randn(8, 6), dim=-1)
+    bp_logits, flp_logits = model(x)
+    bs, fs, nb, nf = loss_sums(bp_logits, flp_logits, bp, flp,
+                               torch.ones(8, dtype=torch.bool))
+    observed = (float(bs.detach()) / nb, float(fs.detach()) / nf)
+    result = gradnorm.step(model, optimizer, bs / nb, fs / nf, observed)
+    ratios = (observed[0] / 0.5, observed[1] / 2.0)
+    assert result["bp_relative_rate"] == pytest.approx(ratios[0] / (sum(ratios) / 2))
+    assert result["flp_relative_rate"] == pytest.approx(ratios[1] / (sum(ratios) / 2))
+    assert result["gradnorm_weight_updated"]
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")
+def test_legacy_kl_checkpoint_rejected_explicitly(tmp_path):
+    model = RiskMLP(3, depth=2, width=8).cuda()
+    optimizer = torch.optim.AdamW(model.parameters())
+    gradnorm = GradNorm("cuda")
+    path = tmp_path / "legacy.pt"
+    save_checkpoint(path, model, optimizer, completed_epoch=1, global_step=1,
+                    metadata={"test": "legacy"}, gradnorm=gradnorm)
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+    payload["gradnorm_state"]["initial_kl"] = payload["gradnorm_state"].pop("initial_ce")
+    torch.save(payload, path)
+    with pytest.raises(ValueError, match="Legacy KL-rate"):
+        load_checkpoint(path, model, optimizer, expected_metadata={"test": "legacy"},
+                        gradnorm=gradnorm)
+
+
 def _batch_step(model, optimizer, gradnorm, x, bp, flp):
     logits_bp, logits_flp = model(x)
     valid = torch.ones(len(bp), device=x.device, dtype=torch.bool)
     bp_sum, flp_sum, n_bp, n_flp = loss_sums(logits_bp, logits_flp, bp, flp, valid)
     return gradnorm.step(model, optimizer, bp_sum / n_bp, flp_sum / n_flp,
-                         soft_target_kl(logits_bp, logits_flp, bp, flp, valid))
+                         (float(bp_sum.detach()) / n_bp, float(flp_sum.detach()) / n_flp))
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")
@@ -156,7 +194,12 @@ def test_bf16_cuda_weights_and_checkpoint_resume_exact(tmp_path):
     flp = F.softmax(torch.randn(64, 6, device="cuda"), dim=-1)
     with torch.autocast("cuda", dtype=torch.bfloat16):
         first = _batch_step(model, optimizer, gradnorm, x, bp, flp)
-    assert first["gradnorm_weight_updated"]
+    assert not first["gradnorm_weight_updated"]
+    assert gradnorm.weights.tolist() == [1.0, 1.0]
+    gradnorm.initialize_from_epoch(first["bp_ce_rate_loss"], first["flp_ce_rate_loss"])
+    with torch.autocast("cuda", dtype=torch.bfloat16):
+        second = _batch_step(model, optimizer, gradnorm, x, bp, flp)
+    assert second["gradnorm_weight_updated"]
     assert not torch.equal(gradnorm.weights, torch.ones_like(gradnorm.weights))
     assert gradnorm.weights.sum().item() == pytest.approx(2.0, abs=1e-6)
     assert bool((gradnorm.weights > 0).all())
@@ -164,7 +207,7 @@ def test_bf16_cuda_weights_and_checkpoint_resume_exact(tmp_path):
     cpu_rng = torch.get_rng_state().clone()
     cuda_rng = torch.cuda.get_rng_state().clone()
     path = tmp_path / "checkpoint.pt"
-    save_checkpoint(path, model, optimizer, completed_epoch=1, global_step=1,
+    save_checkpoint(path, model, optimizer, completed_epoch=1, global_step=2,
                     metadata={"test": "gradnorm"}, gradnorm=gradnorm, scheduler=scheduler)
     restored = RiskMLP(33, depth=3, width=128).cuda()
     restored_optimizer = torch.optim.AdamW(restored.parameters(), lr=0.001,
@@ -175,8 +218,8 @@ def test_bf16_cuda_weights_and_checkpoint_resume_exact(tmp_path):
     torch.rand(1, device="cuda")
     assert load_checkpoint(path, restored, restored_optimizer,
                            expected_metadata={"test": "gradnorm"},
-                           gradnorm=restored_gradnorm, scheduler=restored_scheduler) == (1, 1)
-    assert torch.equal(gradnorm.initial_kl, restored_gradnorm.initial_kl)
+                           gradnorm=restored_gradnorm, scheduler=restored_scheduler) == (1, 2)
+    assert torch.equal(gradnorm.initial_ce, restored_gradnorm.initial_ce)
     assert torch.equal(torch.get_rng_state(), cpu_rng)
     assert torch.equal(torch.cuda.get_rng_state(), cuda_rng)
     assert gradnorm.optimizer.state_dict()["state"].keys() == restored_gradnorm.optimizer.state_dict()["state"].keys()
@@ -209,6 +252,11 @@ def test_production_trainer_gradnorm_branch_and_empty_flp_batch(monkeypatch):
     result = train_epoch(Path("."), state, model, optimizer, 1, gradnorm=gradnorm)
     assert result["optimizer_steps"] == 2
     assert result["bp_rows"] == 16 and result["flp_valid_rows"] == 8
-    assert result["gradnorm"]["updates"] == 1
+    assert result["gradnorm"]["updates"] == 0
+    assert result["gradnorm"]["equal_weight_steps"] == 2
     assert result["gradnorm"]["bp_only_steps"] == 1
-    assert result["gradnorm"]["bp_weight_final"] > 0
+    assert result["gradnorm"]["bp_weight_final"] == 1
+    assert result["gradnorm"]["first_epoch_initial_ce"] == pytest.approx(
+        [result["bp_loss"], result["flp_loss"]])
+    second_epoch = train_epoch(Path("."), state, model, optimizer, 2, gradnorm=gradnorm)
+    assert second_epoch["gradnorm"]["updates"] == 1

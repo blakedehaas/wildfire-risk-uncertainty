@@ -8,7 +8,12 @@ from pathlib import Path
 
 import optuna
 
-from wildfire_risk_uncertainty.hpo.config import FIXED_SMOKE, Configuration, suggest
+from wildfire_risk_uncertainty.hpo.config import (
+    FIXED_SMOKE,
+    GRADNORM_TRAINING_VERSION,
+    Configuration,
+    suggest,
+)
 from wildfire_risk_uncertainty.hpo.objective import run_trial
 from wildfire_risk_uncertainty.hpo.records import read_json, write_json
 from wildfire_risk_uncertainty.hpo.resume import run_resumable_trial
@@ -146,7 +151,8 @@ class RealProvider:
         return {"outer_study": self.outer_study, "trial_number": self.trial_number,
                 "inner_fold": fold, "configuration": self.configuration.serializable(),
                 "seed": 42,
-                **({"loss_balancing": "gradnorm", "gradnorm_alpha": 1.5}
+                **({"loss_balancing": "gradnorm", "gradnorm_alpha": 1.5,
+                    "gradnorm_training_version": GRADNORM_TRAINING_VERSION}
                    if self.loss_balancing == "gradnorm" else {})}
 
     def restore(self, fold: int, completed_epoch: int, global_step: int) -> None:
@@ -277,7 +283,7 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
     states = load_states(root, cache, outer_study)
     name = study_name(outer_study, gradnorm=True)
     artifact = root / "artifacts/hpo"
-    study = open_study(artifact / f"outer_{outer_study}_gradnorm.sqlite3", name, provenance)
+    study = open_study(artifact / f"outer_{outer_study}_gradnorm_v2.sqlite3", name, provenance)
     requested_pause = False
 
     def request_pause(_signal: int, _frame: object) -> None:

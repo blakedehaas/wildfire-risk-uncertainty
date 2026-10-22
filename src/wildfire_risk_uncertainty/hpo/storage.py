@@ -24,7 +24,7 @@ from wildfire_risk_uncertainty.training.preprocessing import stable_json_bytes
 def study_name(outer_study: int, *, gradnorm: bool = False) -> str:
     if outer_study not in range(1, 6):
         raise ValueError("Outer study must be 1..5")
-    return (f"wildfire_outer_{outer_study}_gradnorm_hpo_v1" if gradnorm else
+    return (f"wildfire_outer_{outer_study}_gradnorm_hpo_v2" if gradnorm else
             f"wildfire_outer_{outer_study}_hpo_v1")
 
 
@@ -39,7 +39,8 @@ def metadata(root: Path, outer_study: int, *, kind: str = "real_hpo") -> dict:
                                                 if kind == "gradnorm_hpo" else TRAINING_VERSION),
             **({"loss_balancing": {"method": "GradNorm", "alpha": 1.5,
                                     "weight_optimizer": "Adam", "weight_learning_rate": 0.025,
-                                    "rate_loss": "soft_target_KL"}}
+                                    "rate_loss": "masked_cross_entropy",
+                                    "initial_reference": "first_epoch_separate_support_mean_CE"}}
                if kind == "gradnorm_hpo" else {}),
             "seed": SEED, "sampler": {"name": "TPESampler", "seed": SEED},
             "pruner": ({"name": "NopPruner"} if kind == "gradnorm_hpo" else

@@ -32,6 +32,8 @@ def load_checkpoint(path: Path, model: torch.nn.Module, optimizer: torch.optim.O
                     *, expected_metadata: dict, gradnorm: "GradNorm | None" = None,
                     scheduler: torch.optim.lr_scheduler.LRScheduler | None = None) -> tuple[int, int]:
     saved = torch.load(path, map_location="cuda", weights_only=False)
+    if gradnorm is not None and "initial_kl" in (saved.get("gradnorm_state") or {}):
+        raise ValueError("Legacy KL-rate GradNorm checkpoint cannot resume under CE-rate training")
     if saved["metadata"] != expected_metadata:
         raise ValueError("Checkpoint provenance does not match this training run")
     model.load_state_dict(saved["model_state"])

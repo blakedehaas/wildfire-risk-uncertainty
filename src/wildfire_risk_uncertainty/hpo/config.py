@@ -9,7 +9,7 @@ from wildfire_risk_uncertainty.training.preprocessing import stable_json_bytes
 
 SCHEMA_VERSION = "nested-spatial-hpo-v1"
 TRAINING_VERSION = "checkpoint-6d-frozen-v1"
-GRADNORM_TRAINING_VERSION = "checkpoint-07a-gradnorm-v1"
+GRADNORM_TRAINING_VERSION = "checkpoint-07a-gradnorm-ce-epoch1-v2"
 SEED = 42
 MILESTONES = (1, 4, 16, 64)
 MAX_EPOCHS = 100

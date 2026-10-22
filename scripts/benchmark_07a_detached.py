@@ -224,7 +224,7 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
         stopped = (path / "stop.request.json").exists()
         write(path / f"fold_{fold}.json", {"outer_study": config["outer_study"],
                                              "finished_at": utc(), "stopped_early": stopped,
-                                             "hpo_study": f"wildfire_outer_{config['outer_study']}_gradnorm_hpo_v1",
+                                             "hpo_study": f"wildfire_outer_{config['outer_study']}_gradnorm_hpo_v2",
                                              "hpo_artifact_root": str(ROOT / "artifacts/hpo")})
         return
     if config["kind"] == "pareto":
@@ -265,7 +265,8 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
                     "inner_fold": fold, "configuration": {key: config[key] for key in (
                         "depth", "width", "batch_size", "learning_rate", "weight_decay", "seed")},
                     **({"gradnorm_alpha": 1.5, "gradnorm_weight_optimizer": "Adam",
-                        "gradnorm_weight_learning_rate": 0.025} if is_gradnorm else {})}
+                        "gradnorm_weight_learning_rate": 0.025,
+                        "gradnorm_rate_version": "ce-first-epoch-v2"} if is_gradnorm else {})}
         for epoch in range(1, config["epochs"] + 1):
             if (path / "stop.request.json").exists():
                 break
