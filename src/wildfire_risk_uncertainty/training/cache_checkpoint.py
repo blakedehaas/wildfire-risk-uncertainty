@@ -2,6 +2,7 @@
 
 import hashlib
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import torch
 
@@ -16,6 +17,9 @@ from wildfire_risk_uncertainty.training.preprocessing import (
     stable_json_bytes,
 )
 from wildfire_risk_uncertainty.training.trainer import DATA_ORDER_VERSION
+
+if TYPE_CHECKING:
+    from wildfire_risk_uncertainty.training.gradnorm import GradNorm
 
 
 def cache_binding(cache: HpoCache, state: PreprocessingState) -> dict:
@@ -33,19 +37,24 @@ def cache_binding(cache: HpoCache, state: PreprocessingState) -> dict:
 
 def save_cache_checkpoint(path: Path, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
                           *, completed_epoch: int, global_step: int, cache: HpoCache,
-                          state: PreprocessingState, metadata: dict) -> None:
+                          state: PreprocessingState, metadata: dict,
+                          gradnorm: "GradNorm | None" = None,
+                          scheduler: torch.optim.lr_scheduler.LRScheduler | None = None) -> None:
     save_checkpoint(path, model, optimizer, completed_epoch=completed_epoch,
                     global_step=global_step,
-                    metadata={**metadata, "cache_binding": cache_binding(cache, state)})
+                    metadata={**metadata, "cache_binding": cache_binding(cache, state)},
+                    gradnorm=gradnorm, scheduler=scheduler)
     write_json(path.with_suffix(path.suffix + ".sha256.json"), {"sha256": sha256(path)})
 
 
 def load_cache_checkpoint(path: Path, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
                           *, cache: HpoCache, state: PreprocessingState,
-                          expected_metadata: dict) -> tuple[int, int]:
+                          expected_metadata: dict, gradnorm: "GradNorm | None" = None,
+                          scheduler: torch.optim.lr_scheduler.LRScheduler | None = None) -> tuple[int, int]:
     checksum = read_json(path.with_suffix(path.suffix + ".sha256.json"))["sha256"]
     if sha256(path) != checksum:
         raise ValueError("Checkpoint file hash mismatch")
     return load_checkpoint(path, model, optimizer,
                            expected_metadata={**expected_metadata,
-                                              "cache_binding": cache_binding(cache, state)})
+                                              "cache_binding": cache_binding(cache, state)},
+                           gradnorm=gradnorm, scheduler=scheduler)

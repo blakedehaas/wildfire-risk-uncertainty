@@ -1,6 +1,6 @@
 # Phase 7A training throughput initialization
 
-Status: the short-window benchmark is complete and the later detached 15-fold-epoch calibration passed the [readiness audit](readiness.json). The final [Phase 7A protocol](../../../docs/methodology/checkpoint_07a_loss_balancing.md) records the measured full-epoch costs and selected alpha candidates. No Pareto sweep, HPO trial, or outer TEST access has occurred. The short-window measurements below were taken on 2026-10-20 in this WSL2/Docker environment. Raw machine-readable records are in `hardware.json`, `io_memory.json`, `refined/results.json`, `sustained/results.json`, `no_affinity/results.json`, and `budget.json`.
+Status: the short-window benchmark is complete and the later detached 15-fold-epoch calibration passed the [readiness audit](readiness.json). The proposed static-alpha protocol was [superseded without execution](../../../docs/methodology/checkpoint_07a_loss_balancing.md) by the fixed [GradNorm method](../../../docs/methodology/checkpoint_07a_gradnorm.md). No Pareto sweep, HPO trial, or outer TEST access has occurred. The short-window measurements below were taken on 2026-10-20 in this WSL2/Docker environment. Raw machine-readable records are in `hardware.json`, `io_memory.json`, `refined/results.json`, `sustained/results.json`, `no_affinity/results.json`, and `budget.json`.
 
 ## Accessible hardware
 

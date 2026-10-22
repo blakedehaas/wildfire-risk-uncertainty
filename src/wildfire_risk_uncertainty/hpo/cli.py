@@ -148,11 +148,11 @@ def main() -> None:
     commands.add_parser("synthetic-phase1", help=argparse.SUPPRESS)
     commands.add_parser("synthetic-phase2", help=argparse.SUPPRESS)
     commands.add_parser("real-smoke")
-    future = commands.add_parser("real-hpo", help="Future 6F use only; explicit authorization required")
+    future = commands.add_parser("real-hpo", help="Prepared GradNorm HPO; objective review required")
     future.add_argument("--outer-study", type=int, choices=range(1, 6), required=True)
     future.add_argument("--cache-dir", type=Path, required=True)
     future.add_argument("--pause-after-epoch", type=int, choices=range(1, 101))
-    future.add_argument("--checkpoint-6f-authorized", action="store_true", required=True)
+    future.add_argument("--gradnorm-objective-reviewed", action="store_true", required=True)
     args = parser.parse_args()
     root = Path.cwd()
     if args.command == "synthetic-validate":
@@ -166,7 +166,8 @@ def main() -> None:
     else:
         require_online_authentication()
         run_real_hpo(root, args.outer_study, cache_dir=args.cache_dir,
-                     pause_after_epoch=args.pause_after_epoch)
+                     pause_after_epoch=args.pause_after_epoch,
+                     gradnorm_objective_reviewed=args.gradnorm_objective_reviewed)
 
 
 if __name__ == "__main__":

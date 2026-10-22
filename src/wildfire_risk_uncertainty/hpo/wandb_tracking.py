@@ -66,6 +66,12 @@ def fold_payload(record: dict) -> dict:
         for key in ("bp_loss_sum", "bp_count", "flp_loss_sum", "flp_valid_count",
                     "bp_loss_mean", "flp_loss_mean", "equal_task_objective"):
             payload[f"{prefix}/{role}/{key}"] = metrics[key]
+    if "gradnorm" in record:
+        for key, value in record["gradnorm"].items():
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                payload[f"{prefix}/gradnorm/{key}"] = value
+        payload[f"{prefix}/validation/bp_excess_log_loss"] = record["validation_bp_excess_log_loss"]
+        payload[f"{prefix}/validation/flp_excess_log_loss"] = record["validation_flp_excess_log_loss"]
     return payload
 
 

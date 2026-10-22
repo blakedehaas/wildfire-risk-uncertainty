@@ -24,6 +24,7 @@ from wildfire_risk_uncertainty.training.preprocessing import (
 
 if TYPE_CHECKING:
     from wildfire_risk_uncertainty.training.cache import HpoCache
+    from wildfire_risk_uncertainty.training.gradnorm import GradNorm
 
 BATCH_SIZE = 65536
 SEED = 42
@@ -92,14 +93,18 @@ def _metrics(bp_sum: float, flp_sum: float, bp_count: int, flp_count: int,
 def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
                 optimizer: torch.optim.AdamW, epoch: int, *, outer_study: int = 3,
                 inner_fold: int = 1, batch_size: int = BATCH_SIZE,
-                cache: "HpoCache | None" = None, alpha: float = 0.5) -> dict:
+                cache: "HpoCache | None" = None, alpha: float = 0.5,
+                gradnorm: "GradNorm | None" = None) -> dict:
     if not 0 <= alpha <= 1:
         raise ValueError("alpha must be within [0, 1]")
+    if gradnorm is not None and alpha != 0.5:
+        raise ValueError("Static alpha cannot be combined with GradNorm")
     model.train()
     torch.cuda.reset_peak_memory_stats()
     start = time.perf_counter()
     bp_total = flp_total = 0.0
     bp_rows = flp_rows = steps = 0
+    gradnorm_records = []
     for raw in _batches(root, state, "train", epoch, outer_study, inner_fold, batch_size, cache):
         features, bp, flp, valid = device_batch(raw, state)
         optimizer.zero_grad(set_to_none=True)
@@ -108,17 +113,30 @@ def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
             if not torch.isfinite(bp_logits).all() or not torch.isfinite(flp_logits).all():
                 raise FloatingPointError("Nonfinite logits")
             bp_sum, flp_sum, n_bp, n_flp = loss_sums(bp_logits, flp_logits, bp, flp, valid)
-            loss = streaming_weighted_batch_loss(bp_sum, flp_sum, n_bp,
-                                                 state.rows, state.flp_valid_rows, alpha)
-        if not all(bool(torch.isfinite(x).item()) for x in (bp_sum, flp_sum, loss)):
+            if gradnorm is None:
+                loss = streaming_weighted_batch_loss(bp_sum, flp_sum, n_bp,
+                                                     state.rows, state.flp_valid_rows, alpha)
+            else:
+                loss = None
+        if not all(bool(torch.isfinite(x).item()) for x in (bp_sum, flp_sum)):
             raise FloatingPointError("Nonfinite training loss")
-        loss.backward()
-        for name, param in model.named_parameters():
-            if param.grad is None or not bool(torch.isfinite(param.grad).all().item()):
-                raise FloatingPointError(f"Missing/nonfinite gradient: {name}")
-        optimizer.step()
-        if not all(bool(torch.isfinite(p).all().item()) for p in model.parameters()):
-            raise FloatingPointError("Nonfinite parameter after optimizer step")
+        if gradnorm is None:
+            if not bool(torch.isfinite(loss).item()):
+                raise FloatingPointError("Nonfinite training loss")
+            loss.backward()
+            for name, param in model.named_parameters():
+                if param.grad is None or not bool(torch.isfinite(param.grad).all().item()):
+                    raise FloatingPointError(f"Missing/nonfinite gradient: {name}")
+            optimizer.step()
+            if not all(bool(torch.isfinite(p).all().item()) for p in model.parameters()):
+                raise FloatingPointError("Nonfinite parameter after optimizer step")
+        else:
+            from wildfire_risk_uncertainty.training.gradnorm import soft_target_kl
+
+            bp_loss = bp_sum / n_bp
+            flp_loss = flp_sum * (state.rows / state.flp_valid_rows) / n_bp if n_flp else None
+            kl = soft_target_kl(bp_logits, flp_logits, bp, flp, valid)
+            gradnorm_records.append(gradnorm.step(model, optimizer, bp_loss, flp_loss, kl))
         bp_total += float(bp_sum.item())
         flp_total += float(flp_sum.item())
         bp_rows += n_bp
@@ -127,7 +145,25 @@ def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
     torch.cuda.synchronize()
     if bp_rows != state.rows or flp_rows != state.flp_valid_rows:
         raise ValueError(f"Epoch {epoch} traversal/support mismatch: {bp_rows}/{flp_rows}")
-    return _metrics(bp_total, flp_total, bp_rows, flp_rows, time.perf_counter() - start, steps, alpha)
+    result = _metrics(bp_total, flp_total, bp_rows, flp_rows,
+                      time.perf_counter() - start, steps, alpha)
+    if gradnorm is not None:
+        active = [item for item in gradnorm_records if item["gradnorm_weight_updated"]]
+        result["gradnorm"] = {
+            "method": "GradNorm", "alpha": gradnorm.alpha,
+            "first_step_initial_kl": gradnorm.initial_kl.detach().cpu().tolist(),
+            "updates": len(active),
+            "bp_only_steps": sum(item["flp_kl_rate"] is None for item in gradnorm_records),
+            "undefined_joint_rate_steps": sum(item["flp_kl_rate"] is not None and
+                                                not item["gradnorm_weight_updated"]
+                                                for item in gradnorm_records),
+            "bp_weight_final": float(gradnorm.weights[0].detach()),
+            "flp_weight_final": float(gradnorm.weights[1].detach()),
+            **{key + "_mean": sum(item[key] for item in active) / len(active) if active else None
+               for key in ("bp_shared_gradient_norm", "flp_shared_gradient_norm",
+                           "bp_relative_rate", "flp_relative_rate", "gradnorm_objective")},
+        }
+    return result
 
 
 @torch.no_grad()

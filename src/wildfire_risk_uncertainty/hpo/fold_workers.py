@@ -1,5 +1,6 @@
 """Two persistent CUDA workers for epoch-synchronous inner-fold execution."""
 
+import ctypes
 import hashlib
 import multiprocessing as mp
 import os
@@ -20,6 +21,7 @@ from wildfire_risk_uncertainty.training.cache_checkpoint import (
     save_cache_checkpoint,
 )
 from wildfire_risk_uncertainty.training.cache_states import load_states
+from wildfire_risk_uncertainty.training.gradnorm import GradNorm
 from wildfire_risk_uncertainty.training.preprocessing import stable_json_bytes
 from wildfire_risk_uncertainty.training.trainer import (
     make_model,
@@ -89,11 +91,18 @@ def _worker(
     outer_study: int,
     trial_number: int,
     configuration: Configuration,
+    loss_balancing: str,
+    parent_pid: int,
     folds: tuple[int, ...],
     commands: mp.Queue,
     results: mp.Queue,
 ) -> None:
     try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(1, signal.SIGKILL, 0, 0, 0) != 0:
+            raise OSError(ctypes.get_errno(), "prctl(PR_SET_PDEATHSIG) failed")
+        if os.getppid() != parent_pid:
+            os.kill(os.getpid(), signal.SIGKILL)
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         signal.signal(signal.SIGTERM, signal.SIG_IGN)
         torch.set_num_threads(1)
@@ -108,13 +117,15 @@ def _worker(
         rng = {}
         for fold in folds:
             seed_everything(42)
-            models[fold] = make_model(
+            model, optimizer = make_model(
                 inputs=len(states[fold].inputs),
                 depth=configuration.depth,
                 width=configuration.width,
                 learning_rate=configuration.learning_rate,
                 weight_decay=configuration.weight_decay,
             )
+            gradnorm = GradNorm("cuda") if loss_balancing == "gradnorm" else None
+            models[fold] = (model, optimizer, gradnorm)
             rng[fold] = _rng_state()
         results.put({"status": "ready", "folds": folds})
         while True:
@@ -129,7 +140,7 @@ def _worker(
                     completed_epoch, global_step = message["folds"][fold]
                     _set_rng_state(rng[fold])
                     if completed_epoch:
-                        model, optimizer = models[fold]
+                        model, optimizer, gradnorm = models[fold]
                         epoch, step = load_cache_checkpoint(
                             _checkpoint_path(checkpoint_root, fold, completed_epoch),
                             model,
@@ -142,7 +153,10 @@ def _worker(
                                 "inner_fold": fold,
                                 "configuration": configuration.serializable(),
                                 "seed": 42,
+                                **({"loss_balancing": "gradnorm", "gradnorm_alpha": 1.5}
+                                   if gradnorm is not None else {}),
                             },
+                            gradnorm=gradnorm,
                         )
                         if epoch != completed_epoch or step != global_step:
                             raise ValueError(
@@ -160,7 +174,7 @@ def _worker(
                     if fold not in selected:
                         continue
                     _set_rng_state(rng[fold])
-                    model, optimizer = models[fold]
+                    model, optimizer, gradnorm = models[fold]
                     training = train_epoch(
                         root,
                         states[fold],
@@ -171,6 +185,7 @@ def _worker(
                         inner_fold=fold,
                         batch_size=configuration.batch_size,
                         cache=cache,
+                        gradnorm=gradnorm,
                     )
                     validation = validate(
                         root,
@@ -182,6 +197,7 @@ def _worker(
                         inner_fold=fold,
                         batch_size=configuration.batch_size,
                         cache=cache,
+                        report_excess=gradnorm is not None,
                     )
                     rng[fold] = _rng_state()
                     records[fold] = (training, validation)
@@ -193,7 +209,7 @@ def _worker(
                     if fold not in models:
                         continue
                     _set_rng_state(rng[fold])
-                    model, optimizer = models[fold]
+                    model, optimizer, gradnorm = models[fold]
                     save_cache_checkpoint(
                         _checkpoint_path(checkpoint_root, fold, epoch),
                         model,
@@ -208,7 +224,10 @@ def _worker(
                             "inner_fold": fold,
                             "configuration": configuration.serializable(),
                             "seed": 42,
+                            **({"loss_balancing": "gradnorm", "gradnorm_alpha": 1.5}
+                               if gradnorm is not None else {}),
                         },
+                        gradnorm=gradnorm,
                     )
                     rng[fold] = _rng_state()
                     saved.append(fold)
@@ -228,11 +247,14 @@ def _worker(
             if action == "digests":
                 values = {}
                 for fold in folds:
-                    model, optimizer = models[fold]
+                    model, optimizer, gradnorm = models[fold]
                     values[fold] = {
                         "model_sha256": _state_digest(model.state_dict()),
                         "optimizer_sha256": _state_digest(optimizer.state_dict()),
                         "rng_sha256": _state_digest(rng[fold]),
+                        **({"gradnorm_sha256": _state_digest(gradnorm.state_dict()),
+                            "gradnorm_optimizer_sha256": _state_digest(gradnorm.optimizer.state_dict())}
+                           if gradnorm is not None else {}),
                     }
                 results.put({"status": "digests", "folds": values})
                 continue
@@ -262,6 +284,7 @@ class PersistentFoldProvider:
         trial_number: int,
         checkpoint_root: Path,
         retain_checkpoints: bool = False,
+        loss_balancing: str = "equal",
     ) -> None:
         self.root = root
         self.outer_study = outer_study
@@ -270,6 +293,9 @@ class PersistentFoldProvider:
         self.trial_number = trial_number
         self.checkpoint_root = checkpoint_root
         self.retain_checkpoints = retain_checkpoints
+        if loss_balancing not in {"equal", "gradnorm"}:
+            raise ValueError("Unknown loss-balancing method")
+        self.loss_balancing = loss_balancing
         self._context = mp.get_context("spawn")
         self._workers: list[tuple[mp.Process, mp.Queue, mp.Queue]] = []
         self._closed = False
@@ -296,6 +322,8 @@ class PersistentFoldProvider:
                         self.outer_study,
                         self.trial_number,
                         self.configuration,
+                        self.loss_balancing,
+                        os.getpid(),
                         folds,
                         commands,
                         results,

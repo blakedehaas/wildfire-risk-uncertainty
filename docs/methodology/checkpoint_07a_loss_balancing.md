@@ -1,5 +1,7 @@
 # Phase 7A: loss balancing and inner-CV Pareto protocol
 
+**SUPERSEDED, NEVER EXECUTED.** The proposed static-alpha sweep below was development planning only. No Pareto training run was launched. Phase 7A now adopts the fixed [GradNorm protocol](checkpoint_07a_gradnorm.md) from Chen et al. (2018). The historical gradient probes and readiness calibration remain valid diagnostics; candidate alphas are not scheduled for training.
+
 ## Frozen scope and readiness
 
 The accepted 6A data contract remains fixed: 33 WUI inputs; training-only mean imputation and scaling applied to the matching TRAIN, VALIDATION, and later TEST rows; existing coverage indicators and target masks; Bernoulli BP and six-class conditional FLP. The five frozen outer spatial studies and their five inner folds are unchanged. Outer TEST is never accessed for the work in this checkpoint. Later uncertainty evaluation must stratify performance by missing-feature patterns and coverage indicators.

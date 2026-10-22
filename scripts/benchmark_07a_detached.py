@@ -44,6 +44,7 @@ CONFIG = {"kind": "full_epoch", "outer_study": 3, "folds": [1, 2, 3, 4, 5],
           "reference_run": "07a-20261020T183149Z-b5b9a54d",
           "gpu_vram_stop_mib": 15500, "min_available_ram_bytes": 2 * 1024**3,
           "max_swap_growth_bytes": 128 * 1024**2}
+ALLOW_SUPERSEDED_PARETO = False
 
 
 def utc() -> str:
@@ -115,10 +116,10 @@ STOP_REQUESTED = False
 def child_parent_death(expected_parent: int) -> None:
     """Kernel kills a worker if its supervisor exits before reaping it."""
     libc = ctypes.CDLL(None, use_errno=True)
-    if libc.prctl(1, signal.SIGTERM, 0, 0, 0) != 0:
+    if libc.prctl(1, signal.SIGKILL, 0, 0, 0) != 0:
         raise OSError(ctypes.get_errno(), "prctl(PR_SET_PDEATHSIG) failed")
     if os.getppid() != expected_parent:
-        os.kill(os.getpid(), signal.SIGTERM)
+        os.kill(os.getpid(), signal.SIGKILL)
 
 
 def gpu_snapshot() -> tuple[float, float, float] | None:
@@ -206,6 +207,26 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
     child_parent_death(parent_pid)
     config = read(path / "config.json")
     cpus = sorted(os.sched_getaffinity(0))
+    if config["kind"] == "gradnorm_hpo":
+        from wildfire_risk_uncertainty.hpo.real import run_real_hpo
+        from wildfire_risk_uncertainty.hpo.wandb_tracking import (
+            require_online_authentication,
+        )
+
+        write(path / f"fold_{fold}.ready.json", {"outer_study": config["outer_study"],
+                                                "ready_at": utc(), "pid": os.getpid()})
+        progress(path, fold, 0, "nested_hpo")
+        require_online_authentication()
+        run_real_hpo(ROOT, config["outer_study"],
+                     cache_dir=ROOT / "artifacts/training/hpo_cache_v1",
+                     gradnorm_objective_reviewed=True,
+                     external_stop_file=path / "stop.request.json")
+        stopped = (path / "stop.request.json").exists()
+        write(path / f"fold_{fold}.json", {"outer_study": config["outer_study"],
+                                             "finished_at": utc(), "stopped_early": stopped,
+                                             "hpo_study": f"wildfire_outer_{config['outer_study']}_gradnorm_hpo_v1",
+                                             "hpo_artifact_root": str(ROOT / "artifacts/hpo")})
+        return
     if config["kind"] == "pareto":
         from wildfire_risk_uncertainty.training.phase7a_run import run_task
 
@@ -214,7 +235,10 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
         torch.set_num_interop_threads(1)
         run_task(ROOT, path, config, fold)
         return
-    if config["kind"] == "full_epoch":
+    if config["kind"] in {"full_epoch", "gradnorm_calibration"}:
+        is_gradnorm = config["kind"] == "gradnorm_calibration"
+        if is_gradnorm:
+            from wildfire_risk_uncertainty.training.gradnorm import GradNorm
         setup_start = time.perf_counter()
         os.sched_setaffinity(0, cpus[fold % 2::2])
         torch.set_num_threads(config["threads_each"])
@@ -230,23 +254,28 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
         seed_everything(config["seed"])
         model, optimizer = make_model(33, config["depth"], config["width"],
                                       config["learning_rate"], config["weight_decay"])
+        gradnorm = GradNorm("cuda") if is_gradnorm else None
         setup_seconds = time.perf_counter() - setup_start
         write(path / f"fold_{fold}.ready.json", {"fold": fold, "ready_at": utc(),
                                                  "pid": os.getpid(), "state_sha256": state.digest()})
         epochs = []
         global_step = 0
-        metadata = {"benchmark": "phase_07a_3_epoch", "outer_study": config["outer_study"],
+        metadata = {"benchmark": ("phase_07a_gradnorm_calibration" if is_gradnorm
+                                  else "phase_07a_3_epoch"), "outer_study": config["outer_study"],
                     "inner_fold": fold, "configuration": {key: config[key] for key in (
-                        "depth", "width", "batch_size", "learning_rate", "weight_decay", "seed")}}
+                        "depth", "width", "batch_size", "learning_rate", "weight_decay", "seed")},
+                    **({"gradnorm_alpha": 1.5, "gradnorm_weight_optimizer": "Adam",
+                        "gradnorm_weight_learning_rate": 0.025} if is_gradnorm else {})}
         for epoch in range(1, config["epochs"] + 1):
             if (path / "stop.request.json").exists():
                 break
             progress(path, fold, epoch, "train")
             training = train_epoch(ROOT, state, model, optimizer, epoch,
                                    outer_study=config["outer_study"], inner_fold=fold,
-                                   batch_size=config["batch_size"], cache=cache)
+                                   batch_size=config["batch_size"], cache=cache,
+                                   gradnorm=gradnorm)
             task_metrics(training)
-            if epoch == 1:
+            if epoch == 1 and not is_gradnorm:
                 reference_check(path, config, fold, training, state.digest())
             global_step += training["optimizer_steps"]
             progress(path, fold, epoch, "validation")
@@ -254,26 +283,33 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
                                   counts["validation"]["rows"],
                                   counts["validation"]["flp_valid"],
                                   outer_study=config["outer_study"], inner_fold=fold,
-                                  batch_size=config["batch_size"], cache=cache)
+                                  batch_size=config["batch_size"], cache=cache,
+                                  report_excess=is_gradnorm)
             task_metrics(validation)
             progress(path, fold, epoch, "checkpoint_save")
             checkpoint = path / f"fold_{fold}_epoch_{epoch:03d}.pt"
             before_model = state_digest(model.state_dict())
             before_optimizer = state_digest(optimizer.state_dict())
+            before_gradnorm = state_digest(gradnorm.state_dict()) if gradnorm is not None else None
+            before_gradnorm_optimizer = (state_digest(gradnorm.optimizer.state_dict())
+                                         if gradnorm is not None else None)
             save_start = time.perf_counter()
             save_cache_checkpoint(checkpoint, model, optimizer, completed_epoch=epoch,
                                   global_step=global_step, cache=cache, state=state,
-                                  metadata=metadata)
+                                  metadata=metadata, gradnorm=gradnorm)
             save_seconds = time.perf_counter() - save_start
             progress(path, fold, epoch, "checkpoint_load")
             load_start = time.perf_counter()
             restored_epoch, restored_step = load_cache_checkpoint(
                 checkpoint, model, optimizer, cache=cache, state=state,
-                expected_metadata=metadata)
+                expected_metadata=metadata, gradnorm=gradnorm)
             load_seconds = time.perf_counter() - load_start
             if (restored_epoch != epoch or restored_step != global_step or
                     state_digest(model.state_dict()) != before_model or
-                    state_digest(optimizer.state_dict()) != before_optimizer):
+                    state_digest(optimizer.state_dict()) != before_optimizer or
+                    (gradnorm is not None and (state_digest(gradnorm.state_dict()) != before_gradnorm or
+                                               state_digest(gradnorm.optimizer.state_dict()) !=
+                                               before_gradnorm_optimizer))):
                 raise ValueError(f"Checkpoint resume mismatch for fold {fold}, epoch {epoch}")
             rss, read_bytes, major_faults = proc_stats(os.getpid())
             epoch_record = {"fold": fold, "epoch": epoch, "finished_at": utc(),
@@ -283,6 +319,9 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
                             "checkpoint_bytes": checkpoint.stat().st_size,
                             "checkpoint_sha256": read(checkpoint.with_suffix(".pt.sha256.json"))["sha256"],
                             "model_sha256": before_model, "optimizer_sha256": before_optimizer,
+                            **({"gradnorm_sha256": before_gradnorm,
+                                "gradnorm_optimizer_sha256": before_gradnorm_optimizer}
+                               if is_gradnorm else {}),
                             "global_step": global_step, "current_rss_bytes": rss,
                             "read_bytes": read_bytes, "major_faults": major_faults,
                             "cuda_allocated_bytes": torch.cuda.memory_allocated(),
@@ -399,7 +438,7 @@ def supervise(path: Path) -> None:
                 terminate_children(active, record)
                 active.clear()
                 break
-            if config["kind"] in {"full_epoch", "pareto"} and active:
+            if config["kind"] in {"full_epoch", "gradnorm_calibration", "gradnorm_hpo", "pareto"} and active:
                 gpu = gpu_snapshot()
                 used = gpu[0] if gpu is not None else None
                 ram = available_ram()
@@ -444,7 +483,7 @@ def supervise(path: Path) -> None:
 
 def launch(args) -> None:
     RUNS.mkdir(parents=True, exist_ok=True)
-    if args.kind in {"full_epoch", "pareto"}:
+    if args.kind in {"full_epoch", "gradnorm_calibration", "gradnorm_hpo", "pareto"}:
         if len(os.sched_getaffinity(0)) < 8 or not torch.cuda.is_available():
             raise RuntimeError("Two workers require at least eight accessible logical CPUs and CUDA")
         free, total = torch.cuda.mem_get_info()
@@ -469,7 +508,33 @@ def launch(args) -> None:
                 "starting", "running", "stopping"
             }:
                 raise RuntimeError(f"Another full-epoch calibration is active: {previous.parent.name}")
+    elif args.kind == "gradnorm_calibration":
+        clean_git_sha()
+        config = {**CONFIG, "kind": "gradnorm_calibration", "epochs": 1,
+                  "reference_run": None}
+        for previous in RUNS.glob("07a-*/config.json"):
+            if read(previous).get("kind") == "gradnorm_calibration" and status(previous.parent)["state"] in {
+                "starting", "running", "stopping"
+            }:
+                raise RuntimeError(f"Another GradNorm calibration is active: {previous.parent.name}")
+    elif args.kind == "gradnorm_hpo":
+        if not args.gradnorm_objective_reviewed:
+            raise RuntimeError("GradNorm HPO validation objective requires explicit review")
+        clean_git_sha()
+        if args.outer_study not in range(1, 6):
+            raise ValueError("GradNorm HPO requires --outer-study 1..5")
+        config = {**CONFIG, "kind": "gradnorm_hpo", "outer_study": args.outer_study,
+                  "folds": [1], "processes": 1, "fold_workers": 2,
+                  "threads_each": 1, "epochs": 100,
+                  "reference_run": None, "objective_reviewed": True}
+        for previous in RUNS.glob("07a-*/config.json"):
+            if (read(previous).get("kind") == "gradnorm_hpo" and
+                    read(previous).get("outer_study") == args.outer_study and
+                    status(previous.parent)["state"] in {"starting", "running", "stopping"}):
+                raise RuntimeError(f"Another GradNorm HPO run is active: {previous.parent.name}")
     elif args.kind == "pareto":
+        if not ALLOW_SUPERSEDED_PARETO:
+            raise RuntimeError("Static-alpha Pareto launch was superseded by fixed GradNorm")
         from wildfire_risk_uncertainty.training.phase7a_run import tasks_from_proposals
 
         clean_git_sha()
@@ -529,32 +594,37 @@ def resume(experiment_id: str) -> None:
     path = run_dir(experiment_id)
     config = read(path / "config.json")
     current = status(path)
-    if config["kind"] != "pareto" or current["state"] not in {"stopped", "failed"}:
-        raise RuntimeError("Only a stopped or failed Pareto experiment can resume")
+    if config["kind"] not in {"pareto", "gradnorm_hpo"} or current["state"] not in {"stopped", "failed"}:
+        raise RuntimeError("Only a stopped or failed resumable experiment can resume")
+    if config["kind"] == "pareto" and not ALLOW_SUPERSEDED_PARETO:
+        raise RuntimeError("Static-alpha Pareto resume was superseded by fixed GradNorm")
     if clean_git_sha() != config["source_git_sha"]:
         raise RuntimeError("Pareto resume requires the original committed source revision")
     if (len(os.sched_getaffinity(0)) < 8 or available_ram() < 4 * 1024**3 or
             not torch.cuda.is_available() or torch.cuda.mem_get_info()[0] < 8 * 1024**3):
         raise RuntimeError("Validated CPU, guest RAM, and GPU access are required to resume")
-    if any(read(previous).get("kind") == "pareto" and status(previous.parent)["state"] in {
+    if any(read(previous).get("kind") == config["kind"] and status(previous.parent)["state"] in {
         "starting", "running", "stopping"
     } for previous in RUNS.glob("07a-*/config.json") if previous.parent != path):
         raise RuntimeError("Another Pareto experiment is active")
     (path / "stop.request.json").unlink(missing_ok=True)
-    for task in config["tasks"]:
-        artifact = path / f"fold_{task['id']}.json"
-        if not artifact.exists() or read(artifact).get("stopped_early", False):
-            (path / f"fold_{task['id']}.ready.json").unlink(missing_ok=True)
+    if config["kind"] == "pareto":
+        for task in config["tasks"]:
+            artifact = path / f"fold_{task['id']}.json"
+            if not artifact.exists() or read(artifact).get("stopped_early", False):
+                (path / f"fold_{task['id']}.ready.json").unlink(missing_ok=True)
+    else:
+        (path / "fold_1.ready.json").unlink(missing_ok=True)
     with (path / "supervisor.stdout.log").open("a") as out, (path / "supervisor.stderr.log").open("a") as err:
         proc = subprocess.Popen([sys.executable, __file__, "_supervise", experiment_id], cwd=ROOT,
                                 stdin=subprocess.DEVNULL, stdout=out, stderr=err,
                                 start_new_session=True, close_fds=True)
     for _ in range(100):
         now = status(path)
-        if now["state"] == "running" and now.get("supervisor_pid") == proc.pid and any(
-            (path / f"fold_{task['id']}.ready.json").exists() for task in config["tasks"]
-            if task["id"] not in now["completed_folds"]
-        ):
+        ready = ((path / "fold_1.ready.json").exists() if config["kind"] == "gradnorm_hpo" else
+                 any((path / f"fold_{task['id']}.ready.json").exists() for task in config["tasks"]
+                     if task["id"] not in now["completed_folds"]))
+        if now["state"] == "running" and now.get("supervisor_pid") == proc.pid and ready:
             print(json.dumps({"experiment_id": experiment_id, "state": "running",
                               "supervisor_pid": proc.pid, "run_dir": str(path)}))
             return
@@ -568,7 +638,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     start = sub.add_parser("launch")
-    start.add_argument("--kind", choices=["full_epoch", "pareto", "smoke"], default="full_epoch")
+    start.add_argument("--kind", choices=["full_epoch", "gradnorm_calibration",
+                                          "gradnorm_hpo", "pareto", "smoke"],
+                       default="full_epoch")
+    start.add_argument("--outer-study", type=int, choices=range(1, 6))
+    start.add_argument("--gradnorm-objective-reviewed", action="store_true")
     start.add_argument("--smoke-seconds", type=int, default=30)
     for name in ("status", "results", "analyze", "resume", "stop", "_supervise"):
         sub.add_parser(name).add_argument("experiment_id")

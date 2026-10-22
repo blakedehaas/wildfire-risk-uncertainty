@@ -20,6 +20,7 @@ from wildfire_risk_uncertainty.training.cache_checkpoint import (
     save_cache_checkpoint,
 )
 from wildfire_risk_uncertainty.training.data import inner_chunks, model_inputs
+from wildfire_risk_uncertainty.training.gradnorm import GradNorm
 from wildfire_risk_uncertainty.training.model import RiskMLP
 from wildfire_risk_uncertainty.training.preprocessing import (
     PreprocessingState,
@@ -108,7 +109,8 @@ class RealProvider:
                  states: dict[int, PreprocessingState], counts: dict[int, dict],
                  cache: HpoCache | None = None, trial_number: int | None = None,
                  checkpoint_root: Path | None = None,
-                 retain_checkpoints: bool = False) -> None:
+                 retain_checkpoints: bool = False,
+                 loss_balancing: str = "equal") -> None:
         self.root = root
         self.outer_study = outer_study
         self.configuration = configuration
@@ -118,16 +120,21 @@ class RealProvider:
         self.trial_number = trial_number
         self.checkpoint_root = checkpoint_root
         self.retain_checkpoints = retain_checkpoints
+        if loss_balancing not in {"equal", "gradnorm"}:
+            raise ValueError("Unknown loss-balancing method")
+        self.loss_balancing = loss_balancing
         self.models = {}
 
     def _model(self, fold: int):
         if fold not in self.models:
             seed_everything(42)
-            self.models[fold] = make_model(
+            model, optimizer = make_model(
                 inputs=len(self.states[fold].inputs), depth=self.configuration.depth,
                 width=self.configuration.width, learning_rate=self.configuration.learning_rate,
                 weight_decay=self.configuration.weight_decay,
             )
+            gradnorm = GradNorm("cuda") if self.loss_balancing == "gradnorm" else None
+            self.models[fold] = (model, optimizer, gradnorm)
         return self.models[fold]
 
     def _checkpoint_path(self, fold: int, epoch: int) -> Path:
@@ -138,7 +145,9 @@ class RealProvider:
     def _checkpoint_metadata(self, fold: int) -> dict:
         return {"outer_study": self.outer_study, "trial_number": self.trial_number,
                 "inner_fold": fold, "configuration": self.configuration.serializable(),
-                "seed": 42}
+                "seed": 42,
+                **({"loss_balancing": "gradnorm", "gradnorm_alpha": 1.5}
+                   if self.loss_balancing == "gradnorm" else {})}
 
     def restore(self, fold: int, completed_epoch: int, global_step: int) -> None:
         if completed_epoch == 0:
@@ -146,22 +155,22 @@ class RealProvider:
             return
         if self.cache is None:
             raise ValueError("Resumable HPO requires a validated cache")
-        model, optimizer = self._model(fold)
+        model, optimizer, gradnorm = self._model(fold)
         epoch, step = load_cache_checkpoint(
             self._checkpoint_path(fold, completed_epoch), model, optimizer,
             cache=self.cache, state=self.states[fold],
-            expected_metadata=self._checkpoint_metadata(fold))
+            expected_metadata=self._checkpoint_metadata(fold), gradnorm=gradnorm)
         if epoch != completed_epoch or step != global_step:
             raise ValueError("Checkpoint epoch/optimizer step differs from local fold record")
 
     def save(self, fold: int, epoch: int, global_step: int) -> None:
         if self.cache is None:
             raise ValueError("Resumable HPO requires a validated cache")
-        model, optimizer = self._model(fold)
+        model, optimizer, gradnorm = self._model(fold)
         save_cache_checkpoint(self._checkpoint_path(fold, epoch), model, optimizer,
                               completed_epoch=epoch, global_step=global_step,
                               cache=self.cache, state=self.states[fold],
-                              metadata=self._checkpoint_metadata(fold))
+                              metadata=self._checkpoint_metadata(fold), gradnorm=gradnorm)
 
     def cleanup(self, fold: int, epoch: int) -> None:
         if self.retain_checkpoints:
@@ -172,16 +181,18 @@ class RealProvider:
             previous.with_suffix(previous.suffix + ".sha256.json").unlink(missing_ok=True)
 
     def __call__(self, fold: int, epoch: int) -> tuple[dict, dict]:
-        model, optimizer = self._model(fold)
+        model, optimizer, gradnorm = self._model(fold)
         state = self.states[fold]
         training = train_epoch(self.root, state, model, optimizer, epoch,
                                outer_study=self.outer_study, inner_fold=fold,
-                               batch_size=self.configuration.batch_size, cache=self.cache)
+                               batch_size=self.configuration.batch_size, cache=self.cache,
+                               gradnorm=gradnorm)
         validation = validate(self.root, state, model,
                               self.counts[fold]["validation"]["rows"],
                               self.counts[fold]["validation"]["flp_valid"],
                               outer_study=self.outer_study, inner_fold=fold,
-                              batch_size=self.configuration.batch_size, cache=self.cache)
+                              batch_size=self.configuration.batch_size, cache=self.cache,
+                              report_excess=gradnorm is not None)
         return training, validation
 
 
@@ -245,8 +256,12 @@ def run_smoke(root: Path) -> dict:
 
 
 def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
-                 pause_after_epoch: int | None = None) -> None:
-    """Future 6F entry point; explicit accepted mmap cache and resumable trial only."""
+                 pause_after_epoch: int | None = None,
+                 gradnorm_objective_reviewed: bool = False,
+                 external_stop_file: Path | None = None) -> None:
+    """Prepared GradNorm HPO entry point; objective review is a launch gate."""
+    if not gradnorm_objective_reviewed:
+        raise RuntimeError("Review equal-task CE validation scale before GradNorm HPO launch")
     from wildfire_risk_uncertainty.hpo.fold_workers import PersistentFoldProvider
     from wildfire_risk_uncertainty.training.cache_states import load_states
 
@@ -255,14 +270,14 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
     cache_sha = hashlib.sha256(stable_json_bytes(cache.manifest)).hexdigest()
     if not plan["accepted_mmap_for_6f"] or plan["cache_manifest_sha256"] != cache_sha:
         raise ValueError("Validated HPO cache acceptance/provenance mismatch")
-    provenance = {**metadata(root, outer_study, kind="real_hpo"),
+    provenance = {**metadata(root, outer_study, kind="gradnorm_hpo"),
                   "cache_version": cache.manifest["version"],
                   "cache_manifest_sha256": cache_sha,
                   "partition_offsets_sha256": cache.manifest["files_sha256"]["partition_offsets.npy"]}
     states = load_states(root, cache, outer_study)
-    name = study_name(outer_study)
+    name = study_name(outer_study, gradnorm=True)
     artifact = root / "artifacts/hpo"
-    study = open_study(artifact / f"outer_{outer_study}.sqlite3", name, provenance)
+    study = open_study(artifact / f"outer_{outer_study}_gradnorm.sqlite3", name, provenance)
     requested_pause = False
 
     def request_pause(_signal: int, _frame: object) -> None:
@@ -272,6 +287,8 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
     signal.signal(signal.SIGINT, request_pause)
     signal.signal(signal.SIGTERM, request_pause)
     while True:
+        if requested_pause or (external_stop_file is not None and external_stop_file.exists()):
+            return
         trials = study.get_trials(deepcopy=True)
         if len(trials) > 30 or any(t.state == optuna.trial.TrialState.FAIL for t in trials):
             raise ValueError("Real study exceeded 30 trials or contains FAILED trial; stop for HITL")
@@ -306,7 +323,8 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
         local_dir.mkdir(parents=True, exist_ok=True)
         provider = PersistentFoldProvider(
             root, outer_study, configuration, cache_path=cache_dir,
-            trial_number=trial.number, checkpoint_root=local_dir / "checkpoints")
+            trial_number=trial.number, checkpoint_root=local_dir / "checkpoints",
+            loss_balancing="gradnorm")
         model_parameter_count = sum(p.numel() for p in RiskMLP(
             len(states[1].inputs), depth=configuration.depth, width=configuration.width,
         ).parameters())
@@ -328,7 +346,8 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
                     provider=provider, record_root=artifact / "records", study_name=name,
                     provenance=provenance, tracker=tracker, max_epochs=100,
                     pause_after_epoch=pause_after_epoch,
-                    pause_requested=lambda: requested_pause)
+                    pause_requested=lambda: requested_pause or
+                    (external_stop_file is not None and external_stop_file.exists()))
             finally:
                 provider.close()
         except optuna.TrialPruned:
