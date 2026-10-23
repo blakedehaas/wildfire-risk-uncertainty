@@ -42,18 +42,19 @@ def test_published_equations_with_detached_targets():
     assert weights.grad.tolist() == pytest.approx([0.4, -1.2])
     assert base.grad is None and rates.grad is None
     assert study_name(3) == "wildfire_outer_3_hpo_v1"
-    assert study_name(3, gradnorm=True) == "wildfire_outer_3_gradnorm_hpo_v2"
+    assert study_name(3, gradnorm=True) == "wildfire_outer_3_gradnorm_hpo_v3"
     with pytest.raises(ValueError, match="rates"):
         gradnorm_equations(torch.ones(2), torch.ones(2), torch.zeros(2))
 
 
 def test_hpo_launch_is_gated_before_artifacts(tmp_path):
-    with pytest.raises(RuntimeError, match="Review equal-task CE validation scale"):
+    with pytest.raises(RuntimeError, match="reviewed-objective launch flag"):
         run_real_hpo(tmp_path, 1, cache_dir=tmp_path / "missing-cache")
     assert not (tmp_path / "artifacts").exists()
     study = open_study(tmp_path / "gradnorm.sqlite3", study_name(1, gradnorm=True),
                        {"kind": "gradnorm_hpo"})
     assert isinstance(study.pruner, optuna.pruners.NopPruner)
+    assert study.direction == optuna.study.StudyDirection.MAXIMIZE
 
 
 def test_soft_targets_kl_and_ce_gradients_with_masked_nan():

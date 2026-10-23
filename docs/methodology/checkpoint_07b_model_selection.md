@@ -101,3 +101,15 @@ No retraining, GradNorm changes, outer TEST access, HPO launch, Pareto sweep,
 or final ensemble training was authorized by this closeout. The first Phase 7B
 action is read-only evaluation of existing checkpoints on inner TRAIN and
 geographic VALIDATION.
+
+## Phase 7B progress after this handoff
+
+The [first predictive-adequacy diagnostic](../../reports/training/07b/README.md)
+was completed from saved checkpoints at commit `7d72ccd`; its elevated-risk BP
+underprediction appears on inner TRAIN as well as geographic VALIDATION. The
+subsequent user direction prespecified the [reference-relative HPO ranking
+objective](checkpoint_07b_hpo_objective.md), with equal BP and FLP relative
+logarithmic skill averaged over the five inner folds. This update records the
+new decision without rewriting the authoritative Phase 7A handoff above.
+HPO launch, outer TEST evaluation, and additional methodological experiments
+remain outside the present work.

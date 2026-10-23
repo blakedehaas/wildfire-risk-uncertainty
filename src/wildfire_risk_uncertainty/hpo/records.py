@@ -5,6 +5,7 @@ import os
 import statistics
 from pathlib import Path
 
+from wildfire_risk_uncertainty.hpo.skill import log_skill
 from wildfire_risk_uncertainty.training.preprocessing import stable_json_bytes
 
 
@@ -42,9 +43,20 @@ def task_metrics(raw: dict) -> dict:
 
 def fold_epoch_record(*, outer_study: int, trial_number: int, inner_fold: int,
                       epoch: int, configuration: dict, training: dict, validation: dict,
-                      global_step: int, milestone: bool) -> dict:
+                      global_step: int, milestone: bool,
+                      reference: dict | None = None) -> dict:
     train = task_metrics(training)
     valid = task_metrics(validation)
+    skill = None
+    if reference is not None:
+        if (reference["bp_validation_rows"] != valid["bp_count"] or
+                reference["flp_validation_valid_rows"] != valid["flp_valid_count"]):
+            raise ValueError("Reference and model validation supports differ")
+        bp = log_skill(valid["bp_loss_mean"], reference["bp_validation_reference_ce"])
+        flp = log_skill(valid["flp_loss_mean"], reference["flp_validation_reference_ce"])
+        skill = {"bp": bp, "flp": flp, "J": 0.5 * (bp + flp),
+                 "bp_reference_ce": reference["bp_validation_reference_ce"],
+                 "flp_reference_ce": reference["flp_validation_reference_ce"]}
     return {"outer_study": outer_study, "trial_number": trial_number,
             "inner_fold": inner_fold, "epoch": epoch, "resource_milestone": milestone,
             "global_optimizer_step": global_step, "train_rows": training["bp_rows"],
@@ -55,6 +67,7 @@ def fold_epoch_record(*, outer_study: int, trial_number: int, inner_fold: int,
             "validation_wall_seconds": validation["wall_seconds"],
             "training_rows_per_second": training["rows_per_second"],
             "validation_rows_per_second": validation["rows_per_second"],
+            **({"validation_log_skill": skill} if skill is not None else {}),
             "optimizer_steps": training["optimizer_steps"], "all_finite": True,
             **({"loss_balancing": "gradnorm", "gradnorm": training["gradnorm"],
                 "validation_bp_excess_log_loss": validation["bp_excess_log_loss"],
@@ -71,8 +84,19 @@ def aggregate(epoch: int, records: list[dict]) -> dict:
         raise ValueError("Exactly five distinct inner folds must reach a common epoch")
     if any(r["epoch"] != epoch for r in records):
         raise ValueError("Spatial aggregation requires a common resource level")
-    values = [r["validation"]["equal_task_objective"] for r in records]
+    ranked = ["validation_log_skill" in r for r in records]
+    if any(ranked) and not all(ranked):
+        raise ValueError("Mixed HPO ranking criteria across folds")
+    values = ([r["validation_log_skill"]["J"] for r in records] if all(ranked) else
+              [r["validation"]["equal_task_objective"] for r in records])
     return {"resource_epoch": epoch,
+            "objective_direction": "maximize" if all(ranked) else "minimize",
+            **({"fold_validation_bp_log_skills": [r["validation_log_skill"]["bp"] for r in records],
+                "fold_validation_flp_log_skills": [r["validation_log_skill"]["flp"] for r in records],
+                "validation_bp_log_skill_mean": statistics.fmean(
+                    r["validation_log_skill"]["bp"] for r in records),
+                "validation_flp_log_skill_mean": statistics.fmean(
+                    r["validation_log_skill"]["flp"] for r in records)} if all(ranked) else {}),
             "fold_validation_bp_losses": [r["validation"]["bp_loss_mean"] for r in records],
             "fold_validation_flp_losses": [r["validation"]["flp_loss_mean"] for r in records],
             "fold_validation_objectives": values,

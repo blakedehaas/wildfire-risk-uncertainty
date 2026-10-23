@@ -72,11 +72,17 @@ def fold_payload(record: dict) -> dict:
                 payload[f"{prefix}/gradnorm/{key}"] = value
         payload[f"{prefix}/validation/bp_excess_log_loss"] = record["validation_bp_excess_log_loss"]
         payload[f"{prefix}/validation/flp_excess_log_loss"] = record["validation_flp_excess_log_loss"]
+    if "validation_log_skill" in record:
+        for key, value in record["validation_log_skill"].items():
+            payload[f"{prefix}/validation_log_skill/{key}"] = value
     return payload
 
 
 def spatial_payload(record: dict) -> dict:
     return {"spatial_cv/resource_epoch": record["resource_epoch"],
+            **({"spatial_cv/validation_bp_log_skill_mean": record["validation_bp_log_skill_mean"],
+                "spatial_cv/validation_flp_log_skill_mean": record["validation_flp_log_skill_mean"]}
+               if "validation_bp_log_skill_mean" in record else {}),
             "spatial_cv/validation_objective_mean": record["J_e"],
             "spatial_cv/validation_objective_std": record["fold_objective_std_population"],
             "spatial_cv/validation_bp_mean": record["validation_bp_mean"],
@@ -97,10 +103,12 @@ class OnlineTracker:
         self.sync_state = "online"
         self.start_time = time.perf_counter()
         resume_kwargs = {"id": run_id, "resume": "must"} if run_id is not None else {}
+        pruning_tag = ("nop-pruner" if provenance.get("pruner", {}).get("name") == "NopPruner"
+                       else "asha")
         self.run = wandb.init(
             project="wildfire-risk-uncertainty", group=f"outer-{outer_study}",
             job_type="hpo-trial", name=f"outer-{outer_study}-trial-{trial_number:03d}",
-            tags=[checkpoint, "hpo", "tpe", "asha", f"outer-{outer_study}"],
+            tags=[checkpoint, "hpo", "tpe", pruning_tag, f"outer-{outer_study}"],
             config={**configuration, **provenance, "outer_study": outer_study,
                     "trial_number": trial_number}, mode="online", dir=str(local_dir),
             settings=wandb.Settings(init_timeout=45),

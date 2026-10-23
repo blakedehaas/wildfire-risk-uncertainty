@@ -54,8 +54,22 @@ def reconcile_trial(trial: optuna.trial.FrozenTrial, trial_dir: Path,
         epoch = value["resource_epoch"]
         folds = [read_json(trial_dir / f"fold_{fold}_epoch_{epoch:03d}.json")
                  for fold in range(1, 6)]
-        recomputed = statistics.fmean(f["validation"]["equal_task_objective"] for f in folds)
-        dispersion = statistics.pstdev(f["validation"]["equal_task_objective"] for f in folds)
+        if value.get("objective_direction") == "maximize":
+            scores = []
+            for fold in folds:
+                skill = fold["validation_log_skill"]
+                bp_ce = fold["validation"]["bp_loss_mean"]
+                flp_ce = fold["validation"]["flp_loss_mean"]
+                bp = 1 - bp_ce / skill["bp_reference_ce"]
+                flp = 1 - flp_ce / skill["flp_reference_ce"]
+                if not (close(bp, skill["bp"]) and close(flp, skill["flp"]) and
+                        close(0.5 * (bp + flp), skill["J"])):
+                    raise ValueError("Fold log-skill reconciliation failed")
+                scores.append(0.5 * (bp + flp))
+        else:
+            scores = [f["validation"]["equal_task_objective"] for f in folds]
+        recomputed = statistics.fmean(scores)
+        dispersion = statistics.pstdev(scores)
         if not close(value["J_e"], recomputed) or not close(
                 value["fold_objective_std_population"], dispersion):
             raise ValueError("Five-fold local J_e/dispersion reconciliation failed")

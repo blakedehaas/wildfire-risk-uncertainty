@@ -229,7 +229,7 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
         stopped = (path / "stop.request.json").exists()
         write(path / f"fold_{fold}.json", {"outer_study": config["outer_study"],
                                              "finished_at": utc(), "stopped_early": stopped,
-                                             "hpo_study": f"wildfire_outer_{config['outer_study']}_gradnorm_hpo_v2",
+                                             "hpo_study": f"wildfire_outer_{config['outer_study']}_gradnorm_hpo_v3",
                                              "hpo_artifact_root": str(ROOT / "artifacts/hpo")})
         return
     if config["kind"] == "pareto":

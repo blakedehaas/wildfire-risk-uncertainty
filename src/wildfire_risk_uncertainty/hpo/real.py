@@ -17,6 +17,7 @@ from wildfire_risk_uncertainty.hpo.config import (
 from wildfire_risk_uncertainty.hpo.objective import run_trial
 from wildfire_risk_uncertainty.hpo.records import read_json, write_json
 from wildfire_risk_uncertainty.hpo.resume import run_resumable_trial
+from wildfire_risk_uncertainty.hpo.skill import fold_references
 from wildfire_risk_uncertainty.hpo.storage import metadata, open_study, study_name
 from wildfire_risk_uncertainty.hpo.wandb_tracking import OnlineTracker
 from wildfire_risk_uncertainty.training.cache import HpoCache
@@ -267,7 +268,7 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
                  external_stop_file: Path | None = None) -> None:
     """Prepared GradNorm HPO entry point; objective review is a launch gate."""
     if not gradnorm_objective_reviewed:
-        raise RuntimeError("Review equal-task CE validation scale before GradNorm HPO launch")
+        raise RuntimeError("Explicit reviewed-objective launch flag is required for GradNorm HPO")
     from wildfire_risk_uncertainty.hpo.fold_workers import PersistentFoldProvider
     from wildfire_risk_uncertainty.training.cache_states import load_states
 
@@ -280,10 +281,12 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
                   "cache_version": cache.manifest["version"],
                   "cache_manifest_sha256": cache_sha,
                   "partition_offsets_sha256": cache.manifest["files_sha256"]["partition_offsets.npy"]}
+    references = fold_references(cache, root, outer_study)
+    provenance["inner_fold_constant_references"] = {str(k): v for k, v in references.items()}
     states = load_states(root, cache, outer_study)
     name = study_name(outer_study, gradnorm=True)
     artifact = root / "artifacts/hpo"
-    study = open_study(artifact / f"outer_{outer_study}_gradnorm_v2.sqlite3", name, provenance)
+    study = open_study(artifact / f"outer_{outer_study}_gradnorm_v3.sqlite3", name, provenance)
     requested_pause = False
 
     def request_pause(_signal: int, _frame: object) -> None:
@@ -342,7 +345,7 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
                                     "preprocessing_hashes_by_fold": {str(k): states[k].digest() for k in states},
                                     "model_parameter_count": model_parameter_count,
                                     "fold_execution": execution},
-                                local_dir=local_dir, checkpoint="checkpoint-6f", run_id=run_id)
+                                local_dir=local_dir, checkpoint="checkpoint-07b", run_id=run_id)
         if not link.exists():
             write_json(link, {"run_id": tracker.run_id, "run_url": tracker.run_url})
         try:
@@ -351,6 +354,7 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
                     trial=trial, outer_study=outer_study, configuration=configuration,
                     provider=provider, record_root=artifact / "records", study_name=name,
                     provenance=provenance, tracker=tracker, max_epochs=100,
+                    references=references,
                     pause_after_epoch=pause_after_epoch,
                     pause_requested=lambda: requested_pause or
                     (external_stop_file is not None and external_stop_file.exists()))

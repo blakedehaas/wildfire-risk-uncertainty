@@ -45,9 +45,12 @@ def _summary(state: str, local: TrialRecord, trial: optuna.Trial, started: float
              last_epoch: int, tracker: DisabledTracker) -> dict:
     records = [read_json(path) for path in sorted(local.path.glob("fold_*_epoch_*.json"))]
     common = [read_json(path) for path in sorted(local.path.glob("aggregate_epoch_*.json"))]
+    ranked = common and common[0].get("objective_direction") == "maximize"
     return {"trial_state": state, "final_resource_epoch": last_epoch,
             "objective_at_last_common_resource": common[-1]["J_e"] if common else None,
-            "best_observed_common_resource_objective": min((x["J_e"] for x in common), default=None),
+            "best_observed_common_resource_objective": (
+                max((x["J_e"] for x in common), default=None) if ranked else
+                min((x["J_e"] for x in common), default=None)),
             "total_runtime_seconds": time.perf_counter() - started,
             "total_training_rows_processed": sum(r["train_rows"] for r in records),
             "total_validation_rows_processed": sum(r["validation_rows"] for r in records),
@@ -61,7 +64,8 @@ def run_resumable_trial(*, trial: optuna.Trial, outer_study: int,
                         record_root: Path, study_name: str, provenance: dict,
                         tracker: DisabledTracker, max_epochs: int = 100,
                         pause_after_epoch: int | None = None,
-                        pause_requested: Callable[[], bool] | None = None) -> float | None:
+                        pause_requested: Callable[[], bool] | None = None,
+                        references: dict[int, dict] | None = None) -> float | None:
     """Return None only at a complete common-epoch pause; Optuna stays RUNNING."""
     local = TrialRecord(record_root, study_name, trial.number)
     config = configuration.serializable()
@@ -109,7 +113,8 @@ def run_resumable_trial(*, trial: optuna.Trial, outer_study: int,
                         outer_study=outer_study, trial_number=trial.number, inner_fold=fold,
                         epoch=epoch, configuration=config, training=training,
                         validation=validation, global_step=steps[fold],
-                        milestone=epoch in MILESTONES)
+                        milestone=epoch in MILESTONES,
+                        reference=references[fold] if references is not None else None)
                     new_records[fold] = record
                 folds.append(record)
             if new_records:
@@ -130,7 +135,8 @@ def run_resumable_trial(*, trial: optuna.Trial, outer_study: int,
                         outer_study=outer_study, trial_number=trial.number, inner_fold=fold,
                         epoch=epoch, configuration=config, training=training,
                         validation=validation, global_step=steps[fold],
-                        milestone=epoch in MILESTONES)
+                        milestone=epoch in MILESTONES,
+                        reference=references[fold] if references is not None else None)
                     provider.save(fold, epoch, steps[fold])
                     local.fold(record)
                     provider.cleanup(fold, epoch)

@@ -20,7 +20,8 @@ Provider = Callable[[int, int], tuple[dict, dict]]
 
 def run_trial(*, trial: optuna.Trial, outer_study: int, configuration: Configuration,
               provider: Provider, record_root: Path, study_name: str, provenance: dict,
-              tracker: DisabledTracker, max_epochs: int = 100) -> float:
+              tracker: DisabledTracker, max_epochs: int = 100,
+              references: dict[int, dict] | None = None) -> float:
     """Run all five folds to each epoch before a spatial score/pruning decision."""
     trial.set_user_attr("suggested_configuration", configuration.serializable())
     local = TrialRecord(record_root, study_name, trial.number)
@@ -47,6 +48,7 @@ def run_trial(*, trial: optuna.Trial, outer_study: int, configuration: Configura
                     epoch=epoch, configuration=configuration.serializable(),
                     training=training, validation=validation, global_step=steps[fold],
                     milestone=epoch in MILESTONES,
+                    reference=references[fold] if references is not None else None,
                 )
                 local.fold(record)  # Local authoritative record precedes online logging.
                 tracker.fold(record)
@@ -83,7 +85,9 @@ def run_trial(*, trial: optuna.Trial, outer_study: int, configuration: Configura
     finally:
         summary = {"trial_state": state, "final_resource_epoch": last_epoch,
                    "objective_at_last_common_resource": common[-1]["J_e"] if common else None,
-                   "best_observed_common_resource_objective": min((x["J_e"] for x in common), default=None),
+                   "best_observed_common_resource_objective": (
+                       max((x["J_e"] for x in common), default=None) if references is not None else
+                       min((x["J_e"] for x in common), default=None)),
                    "total_runtime_seconds": time.perf_counter() - started,
                    "total_training_rows_processed": train_rows,
                    "total_validation_rows_processed": valid_rows,

@@ -90,3 +90,7 @@ is acceptable for the paper's wildfire-risk question and specify a response
 within the frozen study design. Separately, the literature-supported HPO ranking
 objective remains undecided and must be finalized before any search. No area of
 applicability analysis is justified by this diagnostic alone.
+
+**Subsequent methodology update:** The HPO ranking objective was later
+prespecified in the [Phase 7B objective decision](../../../docs/methodology/checkpoint_07b_hpo_objective.md).
+The diagnostic findings above remain unchanged; HPO has not launched.
