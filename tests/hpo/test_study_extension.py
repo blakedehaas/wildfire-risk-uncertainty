@@ -95,8 +95,7 @@ def test_extension_checks_identity_and_active_controller(tmp_path: Path, monkeyp
     study = open_study(database, "wildfire_outer_3_gradnorm_hpo_v3", frozen)
     initialize_trial_limit(study, 20)
     monkeypatch.setattr(operations.subprocess, "check_output", lambda *args, **kwargs: b"")
-    monkeypatch.setattr(operations, "metadata", lambda *args, **kwargs: {
-        "kind": "gradnorm_hpo", "source_git_sha": "fixture"})
+    monkeypatch.setattr(operations, "metadata", lambda *args, **kwargs: frozen)
     monkeypatch.setattr(operations, "HpoCache", lambda *args, **kwargs:
                         SimpleNamespace(manifest=manifest))
     monkeypatch.setattr(operations, "load_states", lambda *args, **kwargs: {

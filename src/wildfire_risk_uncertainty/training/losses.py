@@ -18,6 +18,13 @@ def loss_sums(
     return bp_sum, flp_sum, bp_target.numel(), int(flp_valid.sum().item())
 
 
+def stable_bernoulli_ce_sum(logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    """Equivalent Bernoulli CE retaining small positive tails after BCE rounds to zero."""
+    x = logits.float()
+    y = target.float()
+    return (y * F.softplus(-x) + (1 - y) * F.softplus(x)).sum()
+
+
 def equal_task_loss(
     bp_sum: torch.Tensor, flp_sum: torch.Tensor, bp_count: int, flp_count: int
 ) -> torch.Tensor:

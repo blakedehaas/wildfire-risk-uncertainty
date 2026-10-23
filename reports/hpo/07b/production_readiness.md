@@ -1,9 +1,11 @@
 # Phase 7B nested HPO production readiness
 
-**Status:** ready for a bounded first outer study after review; no HPO has been
-launched under the frozen GradNorm and relative-log-skill objective. This audit
-uses committed implementation, frozen reports, inexpensive tests, and read-only
-hardware inspection. It does not repeat a training benchmark.
+**Status at this original prelaunch audit:** ready for a bounded first outer
+study after review. Outer-study-3 HPO was subsequently launched; trial 0
+completed and trial 1 failed after 75 epochs per fold. See the
+[trial-1 numerical investigation](trial_1_numerical_failure.md) for current
+status, recovery limits, and the source-revision registration step. The
+original audit did not repeat a training benchmark.
 
 ## Frozen search and selection
 
@@ -47,8 +49,9 @@ initial cap**. It is stored in the detached configuration and the study's
 `trial_budget.initial` study attribute. The current cap and its history share
 that one atomically updated study attribute and change only through an explicit
 extension command. The study stops when
-it reaches its cap. A failed trial halts the
-study for inspection, and a graceful stop leaves the current trial resumable.
+it reaches its cap. The original runner halted on a failed trial; the
+trial-1 repair records future numerical failures as failed trial slots and
+continues within the same cap. A graceful stop leaves a RUNNING trial resumable.
 The remaining four outer studies are **not** authorized by this initial scope;
 their same-budget execution should follow a review of first-study runtime,
 resource telemetry, failed-trial status, and the scientific adequacy of the
@@ -229,9 +232,8 @@ work is not fully measurable from completed-epoch records.
 
 ### Operator commands
 
-Run from a clean committed `dev` checkout. The following commands are for a
-future authorized run; this audit executed none of the launch or extension
-commands.
+Run from a clean committed `dev` checkout. The initial launch below is
+historical; consult the trial-1 investigation before any further launch.
 
 ```bash
 # Initial approved study: exactly 20 lifetime trial slots.

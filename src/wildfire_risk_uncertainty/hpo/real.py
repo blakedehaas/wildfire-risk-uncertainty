@@ -5,6 +5,7 @@ import hashlib
 import signal
 import subprocess
 import time
+import warnings
 from pathlib import Path
 
 import optuna
@@ -16,7 +17,7 @@ from wildfire_risk_uncertainty.hpo.config import (
     suggest,
 )
 from wildfire_risk_uncertainty.hpo.objective import run_trial
-from wildfire_risk_uncertainty.hpo.records import read_json, write_json
+from wildfire_risk_uncertainty.hpo.records import TrialRecord, read_json, write_json
 from wildfire_risk_uncertainty.hpo.resume import run_resumable_trial
 from wildfire_risk_uncertainty.hpo.skill import fold_references
 from wildfire_risk_uncertainty.hpo.storage import (
@@ -292,10 +293,23 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
                              external_stop_file=external_stop_file)
 
 
+def pending_trial(trials: list[optuna.trial.FrozenTrial], limit: int) -> optuna.trial.FrozenTrial | None:
+    """Return interrupted work; finished failures consume slots without blocking later trials."""
+    if len(trials) > limit:
+        raise ValueError("Real study exceeded its lifetime trial limit")
+    running = [trial for trial in trials if trial.state == optuna.trial.TrialState.RUNNING]
+    if len(running) > 1:
+        raise ValueError("More than one RUNNING trial in frozen single-worker study")
+    return running[0] if running else None
+
+
 def _run_real_hpo_locked(root: Path, outer_study: int, *, cache_dir: Path,
                          pause_after_epoch: int | None, trial_limit: int,
                          external_stop_file: Path | None) -> None:
-    from wildfire_risk_uncertainty.hpo.fold_workers import PersistentFoldProvider
+    from wildfire_risk_uncertainty.hpo.fold_workers import (
+        FoldWorkerError,
+        PersistentFoldProvider,
+    )
     from wildfire_risk_uncertainty.training.cache_states import load_states
 
     cache = HpoCache(root, cache_dir)
@@ -313,7 +327,8 @@ def _run_real_hpo_locked(root: Path, outer_study: int, *, cache_dir: Path,
     provenance["preprocessing_hashes_by_fold"] = {str(k): states[k].digest() for k in states}
     name = study_name(outer_study, gradnorm=True)
     artifact = root / "artifacts/hpo"
-    study = open_study(artifact / f"outer_{outer_study}_gradnorm_v3.sqlite3", name, provenance)
+    study = open_study(artifact / f"outer_{outer_study}_gradnorm_v3.sqlite3", name, provenance,
+                       allow_registered_revision=True)
     initialize_trial_limit(study, trial_limit)
     restore_sampler_state(study)
     requested_pause = False
@@ -328,15 +343,11 @@ def _run_real_hpo_locked(root: Path, outer_study: int, *, cache_dir: Path,
         if requested_pause or (external_stop_file is not None and external_stop_file.exists()):
             return
         trials = study.get_trials(deepcopy=True)
-        if len(trials) > trial_limit or any(t.state == optuna.trial.TrialState.FAIL for t in trials):
-            raise ValueError("Real study exceeded its trial limit or contains FAILED trial")
-        running = [t for t in trials if t.state == optuna.trial.TrialState.RUNNING]
-        if len(running) > 1:
-            raise ValueError("More than one RUNNING trial in frozen single-worker study")
-        if not running and len(trials) == trial_limit:
+        running = pending_trial(trials, trial_limit)
+        if running is None and len(trials) == trial_limit:
             return
-        if running:
-            trial = optuna.Trial(study, running[0]._trial_id)
+        if running is not None:
+            trial = optuna.Trial(study, running._trial_id)
             saved = trial.user_attrs.get("suggested_configuration")
             if saved is None:
                 if (artifact / "records" / name / f"trial_{trial.number:03d}" / "manifest.json").exists():
@@ -388,16 +399,35 @@ def _run_real_hpo_locked(root: Path, outer_study: int, *, cache_dir: Path,
                     pause_after_epoch=pause_after_epoch,
                     pause_requested=lambda: requested_pause or
                     (external_stop_file is not None and external_stop_file.exists()))
-            finally:
+            except BaseException:
+                try:
+                    provider.close(abort=True)
+                except (OSError, RuntimeError) as cleanup_error:
+                    warnings.warn(f"Worker abort cleanup failed: {cleanup_error}", stacklevel=2)
+                raise
+            else:
                 provider.close()
         except optuna.TrialPruned:
             study.tell(trial, state=optuna.trial.TrialState.PRUNED)
             if requested_pause:
                 return
         except Exception as exc:
-            trial.set_user_attr("failure", {"type": type(exc).__name__, "message": str(exc)})
+            numerical = isinstance(exc, FoldWorkerError) and exc.exception_type == "FloatingPointError"
+            failure = {"type": exc.exception_type if numerical else type(exc).__name__,
+                       "message": str(exc), "numerical_failure": numerical}
+            trial.set_user_attr("failure", failure)
             study.tell(trial, state=optuna.trial.TrialState.FAIL)
-            raise
+            if not numerical:
+                raise
+            local = TrialRecord(artifact / "records", name, trial.number)
+            last = sorted(local.path.glob("aggregate_epoch_*.json"))
+            summary = {"trial_state": "FAIL", "failure": failure,
+                       "last_common_epoch": int(last[-1].stem.split("_")[-1]) if last else 0,
+                       "trial_number": trial.number, "local_record_path": str(local.path),
+                       "wandb_run_id": tracker.run_id}
+            local.state(summary)
+            tracker.finish(summary)
+            continue
         else:
             if result is None:
                 return  # Leave this exact trial RUNNING for a later invocation.

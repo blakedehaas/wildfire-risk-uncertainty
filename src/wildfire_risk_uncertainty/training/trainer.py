@@ -13,6 +13,7 @@ from wildfire_risk_uncertainty.training.data import inner_chunks, packed_batches
 from wildfire_risk_uncertainty.training.losses import (
     excess_log_losses,
     loss_sums,
+    stable_bernoulli_ce_sum,
     streaming_weighted_batch_loss,
     target_entropy_sums,
 )
@@ -94,7 +95,8 @@ def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
                 optimizer: torch.optim.AdamW, epoch: int, *, outer_study: int = 3,
                 inner_fold: int = 1, batch_size: int = BATCH_SIZE,
                 cache: "HpoCache | None" = None, alpha: float = 0.5,
-                gradnorm: "GradNorm | None" = None) -> dict:
+                gradnorm: "GradNorm | None" = None,
+                global_step_base: int = 0) -> dict:
     if not 0 <= alpha <= 1:
         raise ValueError("alpha must be within [0, 1]")
     if gradnorm is not None and alpha != 0.5:
@@ -135,9 +137,34 @@ def train_epoch(root: Path, state: PreprocessingState, model: RiskMLP,
         else:
             bp_loss = bp_sum / n_bp
             flp_loss = flp_sum * (state.rows / state.flp_valid_rows) / n_bp if n_flp else None
-            rate_ce = (float(bp_loss.detach()),
+            bp_rate = float(bp_loss.detach())
+            if bp_rate == 0.0:
+                # Finite saturated logits can make float32 BCE round a small
+                # positive Bernoulli CE to zero. Recompute only that batch.
+                bp_sum = stable_bernoulli_ce_sum(bp_logits, bp)
+                bp_loss = bp_sum / n_bp
+                bp_rate = float(bp_loss.detach())
+            rate_ce = (bp_rate,
                        float((flp_sum / n_flp).detach()) if n_flp else None)
-            gradnorm_records.append(gradnorm.step(model, optimizer, bp_loss, flp_loss, rate_ce))
+            try:
+                gradnorm_records.append(gradnorm.step(model, optimizer, bp_loss, flp_loss, rate_ce))
+            except FloatingPointError as exc:
+                stable_bp_ce = (torch.nn.functional.softplus(bp_logits.float()) -
+                                bp.float() * bp_logits.float()).sum()
+                raise FloatingPointError(
+                    f"{exc}; outer_study={outer_study} inner_fold={inner_fold} epoch={epoch} "
+                    f"completed_optimizer_step={global_step_base + steps} "
+                    f"attempted_optimizer_step={global_step_base + steps + 1} "
+                    f"batch_rows={n_bp} bp_target_sum={float(bp.sum()):.17g} "
+                    f"bp_logit_min={float(bp_logits.detach().min()):.17g} "
+                    f"bp_logit_max={float(bp_logits.detach().max()):.17g} "
+                    f"bp_sum={float(bp_sum.detach()):.17g} "
+                    f"bp_ce_stable={float(stable_bp_ce.detach()):.17g} "
+                    f"bp_rate_ce={rate_ce[0]!r} "
+                    f"flp_rate_ce={rate_ce[1]!r} "
+                    f"bp_loss={float(bp_loss.detach())!r} "
+                    f"flp_loss={float(flp_loss.detach()) if flp_loss is not None else None!r}"
+                ) from exc
         bp_total += float(bp_sum.item())
         flp_total += float(flp_sum.item())
         bp_rows += n_bp

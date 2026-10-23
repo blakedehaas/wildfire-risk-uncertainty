@@ -28,6 +28,8 @@ from wildfire_risk_uncertainty.training.data import model_inputs
 from wildfire_risk_uncertainty.training.preprocessing import stable_json_bytes
 from wildfire_risk_uncertainty.training.trainer import DATA_ORDER_VERSION
 
+BP_CE_NUMERICAL_REVISION = "bp-ce-zero-tail-softplus-fallback-v1"
+
 
 def study_name(outer_study: int, *, gradnorm: bool = False) -> str:
     if outer_study not in range(1, 6):
@@ -56,6 +58,7 @@ def metadata(root: Path, outer_study: int, *, kind: str = "real_hpo") -> dict:
                                          if kind == "gradnorm_hpo" else {})},
             **({"worktree_clean_at_launch": not bool(subprocess.check_output(
                 ["git", "status", "--porcelain"], cwd=root)),
+                "bp_ce_numerical_revision": BP_CE_NUMERICAL_REVISION,
                 "training_configuration": {"optimizer": "AdamW", "scheduler": "none",
                                            "epochs": MAX_EPOCHS, "precision": "BF16 autocast",
                                            "initialization_seed": SEED,
@@ -90,7 +93,22 @@ def metadata(root: Path, outer_study: int, *, kind: str = "real_hpo") -> dict:
                 (root / "artifacts/spatial_validation/05b/manifest.json").read_bytes()).hexdigest()}
 
 
-def open_study(storage_file: Path, name: str, expected_metadata: dict) -> optuna.Study:
+def _registered_revision_matches(study: optuna.Study, expected: dict) -> bool:
+    frozen = study.user_attrs.get("frozen_metadata")
+    revision = study.user_attrs.get("numerical_revision")
+    if not isinstance(frozen, dict) or not isinstance(revision, dict):
+        return False
+    if (revision.get("source_git_sha") != expected.get("source_git_sha") or
+            revision.get("marker") != expected.get("bp_ce_numerical_revision") or
+            revision.get("original_source_git_sha") != frozen.get("source_git_sha")):
+        return False
+    ignored = {"source_git_sha", "bp_ce_numerical_revision"}
+    return {k: v for k, v in frozen.items() if k not in ignored} == {
+        k: v for k, v in expected.items() if k not in ignored}
+
+
+def open_study(storage_file: Path, name: str, expected_metadata: dict,
+               *, allow_registered_revision: bool = False) -> optuna.Study:
     storage_file.parent.mkdir(parents=True, exist_ok=True)
     storage = f"sqlite:///{storage_file.resolve()}"
     existing = name in optuna.study.get_all_study_names(storage=storage)
@@ -100,7 +118,9 @@ def open_study(storage_file: Path, name: str, expected_metadata: dict) -> optuna
     study = optuna.create_study(study_name=name, storage=storage, direction=direction,
                                 sampler=sampler(), pruner=selected_pruner, load_if_exists=True)
     if existing:
-        if study.user_attrs.get("frozen_metadata") != expected_metadata:
+        if (study.user_attrs.get("frozen_metadata") != expected_metadata and
+                not (allow_registered_revision and
+                     _registered_revision_matches(study, expected_metadata))):
             raise ValueError("Persisted study metadata/search-space is incompatible")
     else:
         study.set_user_attr("frozen_metadata", expected_metadata)

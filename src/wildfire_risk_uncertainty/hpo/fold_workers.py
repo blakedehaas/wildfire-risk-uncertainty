@@ -4,8 +4,10 @@ import ctypes
 import hashlib
 import multiprocessing as mp
 import os
+import queue
 import random
 import signal
+import time
 import traceback
 from pathlib import Path
 from typing import Self
@@ -35,6 +37,15 @@ from wildfire_risk_uncertainty.training.trainer import (
 
 FOLD_ASSIGNMENTS = ((1, 3, 5), (2, 4))
 MAX_CUDA_WORKERS = 2
+
+
+class FoldWorkerError(RuntimeError):
+    def __init__(self, message: dict) -> None:
+        self.exception_type = message["exception_type"]
+        super().__init__(
+            f"Fold worker failed: {self.exception_type}: {message['exception_message']}\n"
+            f"{message['traceback']}"
+        )
 
 
 def _rng_state() -> dict:
@@ -118,6 +129,7 @@ def _worker(
         counts = support_counts(root, outer_study)
         models = {}
         rng = {}
+        completed_steps = {fold: 0 for fold in folds}
         for fold in folds:
             seed_everything(42)
             model, optimizer = make_model(
@@ -167,6 +179,7 @@ def _worker(
                                 "Checkpoint epoch/optimizer step differs from local fold record"
                             )
                     rng[fold] = _rng_state()
+                    completed_steps[fold] = global_step
                     restored[fold] = (completed_epoch, global_step)
                 results.put({"status": "restored", "folds": restored})
                 continue
@@ -190,6 +203,7 @@ def _worker(
                         batch_size=configuration.batch_size,
                         cache=cache,
                         gradnorm=gradnorm,
+                        global_step_base=completed_steps[fold],
                     )
                     validation = validate(
                         root,
@@ -204,6 +218,7 @@ def _worker(
                         report_excess=gradnorm is not None,
                     )
                     rng[fold] = _rng_state()
+                    completed_steps[fold] += training["optimizer_steps"]
                     records[fold] = (training, validation)
                 results.put({"status": "epoch", "epoch": epoch, "records": records})
                 continue
@@ -269,7 +284,8 @@ def _worker(
             {
                 "status": "error",
                 "exception_type": type(error).__name__,
-                "exception_message": str(error),
+                "exception_message": (f"{error}; trial_number={trial_number} "
+                                      f"configuration={configuration.serializable()}"),
                 "traceback": traceback.format_exc(),
             }
         )
@@ -342,21 +358,29 @@ class PersistentFoldProvider:
                     os.environ.pop(name, None)
                 else:
                     os.environ[name] = value
-        for _, _, results in self._workers:
-            self._expect(results, "ready")
+        for process, _, results in self._workers:
+            self._expect(results, "ready", process)
         if len(self._workers) != MAX_CUDA_WORKERS:
             raise RuntimeError(
                 "Production fold-worker count differs from accepted concurrency"
             )
 
     @staticmethod
-    def _expect(results: mp.Queue, expected: str) -> dict:
-        message = results.get(timeout=900)
+    def _expect(results: mp.Queue, expected: str, process: mp.Process) -> dict:
+        deadline = time.monotonic() + 900
+        while True:
+            try:
+                message = results.get(timeout=1)
+                break
+            except queue.Empty:
+                if not process.is_alive():
+                    raise RuntimeError(
+                        f"Fold worker exited with code {process.exitcode} before {expected} response"
+                    ) from None
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(f"Fold worker did not return {expected} within 900 seconds") from None
         if message.get("status") == "error":
-            raise RuntimeError(
-                f"Fold worker failed: {message['exception_type']}: "
-                f"{message['exception_message']}\n{message['traceback']}"
-            )
+            raise FoldWorkerError(message)
         if message.get("status") != expected:
             raise RuntimeError(f"Unexpected fold-worker response: {message}")
         return message
@@ -372,16 +396,16 @@ class PersistentFoldProvider:
                     },
                 }
             )
-        for _, _, results in self._workers:
-            self._expect(results, "restored")
+        for process, _, results in self._workers:
+            self._expect(results, "restored", process)
 
     def run_epoch(self, epoch: int, folds: list[int]) -> dict[int, tuple[dict, dict]]:
         selected = sorted(folds)
         for _, commands, _ in self._workers:
             commands.put({"action": "epoch", "epoch": epoch, "folds": selected})
         combined = {}
-        for _, _, results in self._workers:
-            message = self._expect(results, "epoch")
+        for process, _, results in self._workers:
+            message = self._expect(results, "epoch", process)
             if message["epoch"] != epoch:
                 raise RuntimeError("Fold worker returned a different epoch")
             combined.update(message["records"])
@@ -395,8 +419,8 @@ class PersistentFoldProvider:
         for _, commands, _ in self._workers:
             commands.put({"action": "save", "folds": folds})
         saved = []
-        for _, _, results in self._workers:
-            saved.extend(self._expect(results, "saved")["folds"])
+        for process, _, results in self._workers:
+            saved.extend(self._expect(results, "saved", process)["folds"])
         if sorted(saved) != sorted(folds):
             raise RuntimeError("Fold-worker checkpoint barrier was incomplete")
 
@@ -405,27 +429,37 @@ class PersistentFoldProvider:
             return
         for _, commands, _ in self._workers:
             commands.put({"action": "cleanup", "folds": folds})
-        for _, _, results in self._workers:
-            self._expect(results, "cleaned")
+        for process, _, results in self._workers:
+            self._expect(results, "cleaned", process)
 
     def state_digests(self) -> dict[int, dict]:
         for _, commands, _ in self._workers:
             commands.put({"action": "digests"})
         combined = {}
-        for _, _, results in self._workers:
-            combined.update(self._expect(results, "digests")["folds"])
+        for process, _, results in self._workers:
+            combined.update(self._expect(results, "digests", process)["folds"])
         return combined
 
-    def close(self) -> None:
+    def close(self, *, abort: bool = False) -> None:
         if self._closed:
             return
         self._closed = True
+        if abort:
+            for process, _, _ in self._workers:
+                if process.is_alive():
+                    try:
+                        process.kill()
+                    except ProcessLookupError:
+                        pass
+            for process, _, _ in self._workers:
+                process.join(timeout=5)
+            return
         for process, commands, _ in self._workers:
             if process.is_alive():
                 commands.put({"action": "close"})
         for process, _, results in self._workers:
             if process.is_alive():
-                self._expect(results, "closed")
+                self._expect(results, "closed", process)
             process.join(timeout=30)
             if process.is_alive():
                 process.terminate()

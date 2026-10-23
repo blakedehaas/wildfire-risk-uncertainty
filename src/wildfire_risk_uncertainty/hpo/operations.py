@@ -14,6 +14,8 @@ from wildfire_risk_uncertainty.hpo.config import sampler
 from wildfire_risk_uncertainty.hpo.records import read_json
 from wildfire_risk_uncertainty.hpo.status import status
 from wildfire_risk_uncertainty.hpo.storage import (
+    BP_CE_NUMERICAL_REVISION,
+    _registered_revision_matches,
     extend_trial_limit,
     metadata,
     restore_sampler_state,
@@ -95,7 +97,8 @@ def extend(root: Path, outer_study: int, new_limit: int) -> dict:
         study = _study(root, outer_study)
         frozen = study.user_attrs.get("frozen_metadata")
         current = metadata(root, outer_study, kind="gradnorm_hpo")
-        if not isinstance(frozen, dict) or any(frozen.get(key) != value for key, value in current.items()):
+        if (not isinstance(frozen, dict) or
+                (frozen != current and not _registered_revision_matches(study, current))):
             raise ValueError("Current source/environment differs from frozen study methodology")
         cache = HpoCache(root, root / "artifacts/training/hpo_cache_v1")
         if frozen["cache_manifest_sha256"] != hashlib.sha256(
@@ -106,9 +109,61 @@ def extend(root: Path, outer_study: int, new_limit: int) -> dict:
                                                        for k, value in states.items()}:
             raise ValueError("Frozen fold preprocessing identity differs")
         restore_sampler_state(study)
-        if any(t.state == optuna.trial.TrialState.FAIL for t in study.trials):
-            raise ValueError("Failed trial requires inspection before extension")
+        unreviewed = [trial.number for trial in study.trials
+                      if trial.state == optuna.trial.TrialState.FAIL and
+                      not trial.user_attrs.get("failure", {}).get("numerical_failure") and
+                      not (trial.number == 1 and study.user_attrs.get("numerical_revision"))]
+        if unreviewed:
+            raise ValueError(f"Failed trials require inspection before extension: {unreviewed}")
         return extend_trial_limit(study, new_limit)
+
+
+def adopt_bp_ce_fix(root: Path, outer_study: int) -> dict:
+    """Register a reviewed source revision; never change finished trial state."""
+    if outer_study != 3:
+        raise ValueError("This numerical recovery is specific to outer study 3")
+    if subprocess.check_output(["git", "status", "--porcelain"], cwd=root):
+        raise RuntimeError("Revision adoption requires a clean committed worktree")
+    database = _database(root, outer_study)
+    with study_controller_lock(database):
+        if _active_detached_controller(root, outer_study):
+            raise RuntimeError("A detached controller is active for this study")
+        study = _study(root, outer_study)
+        frozen = study.user_attrs["frozen_metadata"]
+        current = metadata(root, outer_study, kind="gradnorm_hpo")
+        if current["bp_ce_numerical_revision"] != BP_CE_NUMERICAL_REVISION:
+            raise ValueError("Unexpected numerical implementation revision")
+        ignored = {"source_git_sha", "bp_ce_numerical_revision"}
+        if any(frozen.get(key) != value for key, value in current.items() if key not in ignored):
+            raise ValueError("Frozen scientific/environment provenance differs")
+        if [trial.state.name for trial in study.trials[:2]] != ["COMPLETE", "FAIL"]:
+            raise ValueError("Expected completed trial 0 and failed trial 1")
+        original = root / "reports/hpo/07b/trial1_replay_fold1.json"
+        corrected = root / "reports/hpo/07b/trial1_replay_fold1_stable_ce.json"
+        before, after = read_json(original), read_json(corrected)
+        checkpoint = root / "artifacts/hpo/records" / study.study_name / "trial_001" / \
+            "checkpoints/fold_1_epoch_075.pt"
+        digest = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+        if (before["original_source_git_sha"] != frozen["source_git_sha"] or
+                before["checkpoint_sha256"] != digest or after["checkpoint_sha256"] != digest or
+                before["outcome"] != "numerical_exception" or
+                "bp_rate_ce=0.0" not in before["exception"] or
+                after["outcome"] != "epoch_completed"):
+            raise ValueError("Reviewed replay evidence does not match persisted trial 1")
+        existing = study.user_attrs.get("numerical_revision")
+        revision = {"source_git_sha": current["source_git_sha"],
+                    "original_source_git_sha": frozen["source_git_sha"],
+                    "marker": BP_CE_NUMERICAL_REVISION,
+                    "failure_replay_sha256": hashlib.sha256(original.read_bytes()).hexdigest(),
+                    "corrected_replay_sha256": hashlib.sha256(corrected.read_bytes()).hexdigest(),
+                    "trial_1_state": "FAIL", "trial_1_checkpoint_epoch": 75}
+        if existing is not None and existing != revision:
+            raise ValueError("Different numerical revision is already registered")
+        if existing is None:
+            study.set_user_attr("numerical_revision", revision)
+        return {"study": study.study_name, "registered_revision": revision,
+                "trial_0_state": "COMPLETE", "trial_1_state": "FAIL",
+                "trial_limit": study.user_attrs["trial_budget"]["current"]}
 
 
 def trial_rows(root: Path, outer_study: int) -> list[dict]:
@@ -181,7 +236,7 @@ def summary(root: Path, outer_study: int) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    for command in ("status", "results", "export", "extend"):
+    for command in ("status", "results", "export", "extend", "adopt-bp-ce-fix"):
         item = sub.add_parser(command)
         item.add_argument("--outer-study", type=int, choices=range(1, 6), required=True)
         if command == "export":
@@ -194,6 +249,8 @@ def main() -> None:
         result = summary(root, args.outer_study)
     elif args.command == "extend":
         result = extend(root, args.outer_study, args.new_limit)
+    elif args.command == "adopt-bp-ce-fix":
+        result = adopt_bp_ce_fix(root, args.outer_study)
     elif args.command == "results":
         result = trial_rows(root, args.outer_study)
     else:

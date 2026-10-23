@@ -21,7 +21,11 @@ from wildfire_risk_uncertainty.training.gradnorm import (
     gradnorm_equations,
     soft_target_kl,
 )
-from wildfire_risk_uncertainty.training.losses import loss_sums, target_entropy_sums
+from wildfire_risk_uncertainty.training.losses import (
+    loss_sums,
+    stable_bernoulli_ce_sum,
+    target_entropy_sums,
+)
 from wildfire_risk_uncertainty.training.model import RiskMLP
 from wildfire_risk_uncertainty.training.trainer import train_epoch
 
@@ -79,6 +83,21 @@ def test_soft_targets_kl_and_ce_gradients_with_masked_nan():
     assert kl_flp == pytest.approx((flp_sum.item() - flp_h.item()) / n_flp, abs=1e-6)
     assert math.isfinite(kl_bp) and math.isfinite(kl_flp)
     assert GRADNORM_ALPHA == 1.5
+
+
+def test_stable_bp_ce_recovers_finite_saturated_zero_batch() -> None:
+    logits = torch.full((32768,), -15.0625, requires_grad=True)
+    targets = torch.zeros_like(logits)
+    rounded = F.binary_cross_entropy_with_logits(logits, targets, reduction="sum")
+    stable = stable_bernoulli_ce_sum(logits, targets)
+    assert rounded.item() == 0.0
+    assert stable.item() == pytest.approx(0.0094164926558732986, rel=1e-5)
+    stable.backward()
+    assert torch.isfinite(logits.grad).all() and (logits.grad > 0).all()
+    moderate = torch.tensor([-2., 0.5, 3.], requires_grad=True)
+    soft = torch.tensor([0.1, 0.5, 0.9])
+    assert stable_bernoulli_ce_sum(moderate, soft).item() == pytest.approx(
+        F.binary_cross_entropy_with_logits(moderate, soft, reduction="sum").item(), rel=1e-6)
 
 
 def test_no_flp_batch_keeps_weights_and_weight_optimizer_unchanged():
