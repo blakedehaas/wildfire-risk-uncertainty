@@ -41,10 +41,13 @@ rejected epoch-4 pruning; its old ASHA study and records remain historical.
 **Proposed first launch: outer study 3, exactly 20 full 100-epoch trials.**
 This is a project compute-budget choice. It gives the pinned TPE sampler 10
 startup trials and at most 10 adaptive suggestions while limiting the first
-commitment to one of the five outer studies. The launcher now requires an
-explicit `--trial-limit` between 11 and the historical 30-trial planning
-ceiling; `20` is stored in the detached configuration and immutable study
-metadata. The study stops when it reaches its cap. A failed trial halts the
+commitment to one of the five outer studies. The launcher requires an
+explicit lifetime `--trial-limit` between 11 and 150; **20 remains the approved
+initial cap**. It is stored in the detached configuration and the study's
+`trial_budget.initial` study attribute. The current cap and its history share
+that one atomically updated study attribute and change only through an explicit
+extension command. The study stops when
+it reaches its cap. A failed trial halts the
 study for inspection, and a graceful stop leaves the current trial resumable.
 The remaining four outer studies are **not** authorized by this initial scope;
 their same-budget execution should follow a review of first-study runtime,
@@ -58,8 +61,8 @@ depth/width/batch combinations plus two continuous optimizer dimensions.
 TPE may repeat categorical combinations. This is a bounded applied-science
 search, not evidence that the hyperparameter optimum has been found. Five
 independent studies at 20 trials each would require 100 full evaluations;
-the previous 30-per-study ceiling of 150 is retained only as a hard upper
-guard, not a launch target.
+the previous 30-per-study ceiling of 150 is retained only as an upper guard
+for an explicitly approved extension, not a launch target.
 
 ## Time and resource estimate
 
@@ -135,3 +138,124 @@ result. The SQLite study and local trial records retain configurations,
 component scores, references, maximum-resource score, and run identity.
 W&B availability and the physical resource gates remain operational risks;
 they do not alter the frozen scientific score.
+
+## Persistence, accounting, and extension
+
+The stable study is `wildfire_outer_3_gradnorm_hpo_v3` in
+`artifacts/hpo/outer_3_gradnorm_v3.sqlite3`; detached experiment IDs identify
+controller attempts, not new Optuna studies. `trial_limit` is a **lifetime
+total** including completed, running, and failed trials. Optuna's per-call
+`n_trials` is not used to allocate the production budget. The single controller
+holds an exclusive file lock while suggesting and training; an extension holds
+the same lock and checks live detached supervisors. A cap increase from 20 to
+30 therefore permits **at most 10 new trial numbers**. It does not reset trial
+history, retry a FAILED trial, replace an objective, or rerun a completed
+trial. An extension requires the original committed source revision, frozen
+search and data identities, and the same Python/library/GPU environment. The
+recorded budget history preserves initial and later caps. Review any failure
+before extension; this interface deliberately refuses extension with FAILED
+trials.
+
+Frozen study metadata records the launch commit and clean-worktree flag;
+canonical feature order, cache, geographic partition and preprocessing hashes;
+Python, PyTorch, CUDA runtime, Optuna, NumPy and W&B versions; platform, CPU
+availability, GPU model and memory; search space, seeds, TPE startup setting,
+training configuration, GradNorm version, and objective identity. Trial
+manifests bind that metadata to the suggested configuration and deterministic
+`trial_NNN` artifact directory. Optuna records start/end timestamps, trial
+state, parameters, intermediate values, and the final selection value.
+
+The sampler is seeded at 42 with 10 startup trials. After each full suggestion,
+both Optuna 5.0.0 TPE and startup random-generator states are stored in study
+attributes and restored on reopening. The state is checked against the last
+suggested trial. A crash between Optuna's parameter writes and the RNG-state
+attribute can leave an ambiguous state; reopening then **stops for inspection**
+instead of silently suggesting from a reset stream. Local SQLite plus these
+states support reproducible sequential continuation under the pinned software
+and unchanged history. Bitwise-identical continuation across library versions,
+hardware changes, or asynchronous concurrent trial suggestions is not claimed.
+Production trials remain sequential; only their fold training uses two workers.
+
+Each fold's JSON epoch record contains BP and masked FLP training/validation
+loss sums, support counts and means, BP/FLP validation excess log loss, the two
+TRAIN-climatology reference cross-entropies, individual log skills, their
+equal-weight objective, GradNorm diagnostics, optimizer steps, train/validation
+time, and sampled process/GPU peaks. Five fold results and their population
+standard deviation appear in each common-epoch aggregate. The epoch-100
+aggregate alone supplies the Optuna selection value. Epoch 1/4/16/64 values
+are diagnostic intermediates, with `NopPruner`. BP elevated-risk metrics are
+retained in the earlier adequacy report; adding them to every HPO epoch would
+require extra inference and is outside this execution audit. The scheduler is
+absent in the frozen AdamW training setup. Local records are authoritative;
+W&B mirrors them once per fold epoch and common epoch.
+
+Checkpoint files use atomic replacement and SHA-256 sidecars. They include
+model, optimizer, GradNorm and GradNorm optimizer, Python/NumPy/Torch CPU/CUDA
+RNG state, epoch and step, plus cache/preprocessing/trial/fold identity. Each
+two-worker epoch saves and records folds in batches of at most two. If three
+fold records are valid when interrupted, resume restores and skips those three;
+it trains only the missing folds and constructs the aggregate after all five
+valid records exist. An incomplete in-flight fold may repeat from its last
+epoch checkpoint. Missing, corrupt, or mismatched checkpoints stop recovery;
+they are never silently accepted. Retention keeps the recent two checkpoints
+per fold rather than every model snapshot. A FAILED Optuna trial is not
+automatically retried. Graceful stop leaves a RUNNING trial with a resumable
+local `PAUSED` record; hard termination can leave a RUNNING trial whose latest
+valid common or fold records are inspected on resume.
+
+Trial CSV export includes trial number, state, timestamps, configuration,
+objective, five fold values/dispersion, epoch/fold count, training/validation/
+checkpoint seconds, sampled process/GPU peaks, and failure text. Study status
+reports counts by state, best completed objective, measured compute, remaining
+slots, observed time per completed fit, and detached-run resource extrema. Its
+unfinalized-compute total
+includes resumable work and should not be interpreted as wasted GPU time.
+Optuna trial wall time includes
+setup, checkpointing, W&B and pauses; it is not a pure compute measure.
+Detached `resource_samples.csv` retains one-second device/RAM/swap samples,
+while its status file retains peak device VRAM, peak worker RSS, minimum
+available RAM, maximum swap growth, and resource-gate errors. The gate records
+its triggering sample and thresholds as a structured event. The worker RSS
+sample includes the detached controller's nested fold-worker process tree;
+shared mappings can be counted more than once, so host available RAM remains
+the stronger overall memory gate. Data loading is
+included in epoch training time and is not separately timed. Checkpoint time
+is measured at the parent barrier; per-fold allocation within a batch is an
+equal share. Resource samples are process-wide and cannot be attributed exactly
+to a specific overlapping fold or trial. Setup overhead is inferred from wall
+time minus timed work; no precise component timer is claimed. Hard termination
+can waste an unfinished epoch or checkpoint write; the amount of that in-flight
+work is not fully measurable from completed-epoch records.
+
+### Operator commands
+
+Run from a clean committed `dev` checkout. The following commands are for a
+future authorized run; this audit executed none of the launch or extension
+commands.
+
+```bash
+# Initial approved study: exactly 20 lifetime trial slots.
+uv run python scripts/benchmark_07a_detached.py launch --kind gradnorm_hpo --outer-study 3 --trial-limit 20 --gradnorm-objective-reviewed
+
+# Use the returned detached experiment ID for controller status and stop/resume.
+uv run python scripts/benchmark_07a_detached.py status <experiment-id>
+uv run python scripts/benchmark_07a_detached.py stop <experiment-id>
+uv run python scripts/benchmark_07a_detached.py resume <experiment-id>
+
+# Read-only Optuna study progress and individual trial results.
+uv run python -m wildfire_risk_uncertainty.hpo.operations status --outer-study 3
+uv run python -m wildfire_risk_uncertainty.hpo.operations results --outer-study 3
+uv run python -m wildfire_risk_uncertainty.hpo.operations export --outer-study 3 --output reports/hpo/07b/outer_3_trials.csv
+
+# Only after the controller has stopped and a larger cap is separately approved:
+uv run python -m wildfire_risk_uncertainty.hpo.operations extend --outer-study 3 --new-limit 30
+uv run python scripts/benchmark_07a_detached.py launch --kind gradnorm_hpo --outer-study 3 --trial-limit 30 --gradnorm-objective-reviewed
+```
+
+For an interrupted trial, inspect study status and local worker logs, then
+resume the same detached experiment ID under its original cap. If a completed
+20-trial controller is extended, launch a new detached controller attempt with
+the new cap; it opens the **same SQLite study and study name**. Never edit the
+SQLite database, trial JSON, or budget attributes by hand. Exporting into a
+tracked `reports/` path is an explicit operator action and should be committed
+with the run's provenance if used for publication.

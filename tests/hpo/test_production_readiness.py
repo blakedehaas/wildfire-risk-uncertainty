@@ -8,7 +8,11 @@ import pytest
 from wildfire_risk_uncertainty.hpo.config import TPE_STARTUP_TRIALS, sampler
 from wildfire_risk_uncertainty.hpo.real import run_real_hpo
 from wildfire_risk_uncertainty.hpo.status import status
-from wildfire_risk_uncertainty.hpo.storage import open_study, study_name
+from wildfire_risk_uncertainty.hpo.storage import (
+    initialize_trial_limit,
+    open_study,
+    study_name,
+)
 
 
 def test_tpe_startup_and_no_pruning_study_status(tmp_path: Path) -> None:
@@ -17,7 +21,8 @@ def test_tpe_startup_and_no_pruning_study_status(tmp_path: Path) -> None:
     assert status(tmp_path, 3, gradnorm=True)["state"] == "not_started"
     name = study_name(3, gradnorm=True)
     database = tmp_path / "artifacts/hpo/outer_3_gradnorm_v3.sqlite3"
-    study = open_study(database, name, {"kind": "gradnorm_hpo", "trial_limit": 20})
+    study = open_study(database, name, {"kind": "gradnorm_hpo"})
+    initialize_trial_limit(study, 20)
     assert study.direction == optuna.study.StudyDirection.MAXIMIZE
     assert isinstance(study.pruner, optuna.pruners.NopPruner)
     trial = study.ask()
@@ -33,9 +38,9 @@ def test_tpe_startup_and_no_pruning_study_status(tmp_path: Path) -> None:
     assert status(tmp_path, 3, gradnorm=True)["state"] == "budget_reached"
 
 
-@pytest.mark.parametrize("limit", [None, 0, 10, 31])
+@pytest.mark.parametrize("limit", [None, 0, 10, 151])
 def test_invalid_trial_limit_fails_before_data_access(tmp_path: Path, limit: int | None) -> None:
-    with pytest.raises(ValueError, match="11..30-trial"):
+    with pytest.raises(ValueError, match="11..150-trial"):
         run_real_hpo(tmp_path, 1, cache_dir=tmp_path / "missing-cache",
                      gradnorm_objective_reviewed=True, trial_limit=limit)
     assert not (tmp_path / "artifacts").exists()

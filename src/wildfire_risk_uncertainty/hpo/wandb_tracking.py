@@ -59,6 +59,8 @@ def fold_payload(record: dict) -> dict:
                f"{prefix}/global_optimizer_step": record["global_optimizer_step"],
                f"{prefix}/training_wall_seconds": record["training_wall_seconds"],
                f"{prefix}/validation_wall_seconds": record["validation_wall_seconds"],
+               **({f"{prefix}/checkpoint_wall_seconds": record["checkpoint_wall_seconds"]}
+                  if "checkpoint_wall_seconds" in record else {}),
                f"{prefix}/training_rows_per_second": record["training_rows_per_second"],
                f"{prefix}/validation_rows_per_second": record["validation_rows_per_second"]}
     for role in ("training", "validation"):

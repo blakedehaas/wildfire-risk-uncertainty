@@ -160,6 +160,26 @@ def proc_stats(pid: int) -> tuple[int, int, int]:
         return 0, 0, 0
 
 
+def process_tree_stats(pid: int) -> tuple[int, int, int]:
+    """Sample controller and nested fold workers without adding a dependency."""
+    pending = [pid]
+    seen = set()
+    totals = [0, 0, 0]
+    while pending:
+        current = pending.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        values = proc_stats(current)
+        totals = [left + right for left, right in zip(totals, values)]
+        try:
+            children = Path(f"/proc/{current}/task/{current}/children").read_text()
+            pending.extend(int(item) for item in children.split())
+        except OSError:
+            pass
+    return tuple(totals)
+
+
 def state_digest(value: object) -> str:
     digest = hashlib.sha256()
 
@@ -388,7 +408,11 @@ def supervise(path: Path) -> None:
     write(path / "status.json", record)
     active: dict[int, subprocess.Popen] = {}
     failure = None
-    max_vram = 0.0
+    max_vram = float(record.get("peak_sampled_device_vram_mib", 0))
+    max_worker_rss = int(record.get("peak_sampled_worker_rss_bytes", 0))
+    min_available_ram = record.get("minimum_sampled_available_ram_bytes")
+    max_swap_growth = int(record.get("maximum_sampled_swap_growth_bytes", 0))
+    resource_samples = int(record.get("resource_sample_count", 0))
     samples_path = path / "resource_samples.csv"
     samples_new = not samples_path.exists()
     samples = samples_path.open("a", newline="")
@@ -451,7 +475,7 @@ def supervise(path: Path) -> None:
                 used = gpu[0] if gpu is not None else None
                 ram = available_ram()
                 swap = swap_used()
-                worker_stats = [proc_stats(proc.pid) for proc in active.values()]
+                worker_stats = [process_tree_stats(proc.pid) for proc in active.values()]
                 sample_writer.writerow({"sampled_at": utc(),
                                         "elapsed_seconds": time.monotonic() - start_time,
                                         "active_folds": ",".join(map(str, sorted(active))),
@@ -464,12 +488,23 @@ def supervise(path: Path) -> None:
                                         "gpu_utilization_percent": gpu[1] if gpu else None,
                                         "gpu_memory_utilization_percent": gpu[2] if gpu else None})
                 samples.flush()
+                resource_samples += 1
+                max_worker_rss = max(max_worker_rss, sum(x[0] for x in worker_stats))
+                min_available_ram = ram if min_available_ram is None else min(min_available_ram, ram)
+                max_swap_growth = max(max_swap_growth, max(0, swap - initial_swap))
                 if used is not None:
                     max_vram = max(max_vram, used)
                 if (used is not None and used > config["gpu_vram_stop_mib"] or
                         ram < config["min_available_ram_bytes"] or
                         swap - initial_swap > config["max_swap_growth_bytes"]):
                     failure = "Resource safety gate: VRAM, available RAM, or swap growth"
+                    record["resource_safety_event"] = {
+                        "at": utc(), "gpu_vram_used_mib": used,
+                        "available_ram_bytes": ram,
+                        "swap_growth_bytes": swap - initial_swap,
+                        "gpu_vram_stop_mib": config["gpu_vram_stop_mib"],
+                        "min_available_ram_bytes": config["min_available_ram_bytes"],
+                        "max_swap_growth_bytes": config["max_swap_growth_bytes"]}
                     terminate_children(active, record)
                     active.clear()
                     break
@@ -478,7 +513,11 @@ def supervise(path: Path) -> None:
         final_state = "failed" if failure else ("stopped" if STOP_REQUESTED else "complete")
         record.update(state=final_state, ended_at=utc(), error=failure,
                       completed_folds=completed, pending_folds=pending,
-                      peak_sampled_device_vram_mib=max_vram)
+                      peak_sampled_device_vram_mib=max_vram,
+                      peak_sampled_worker_rss_bytes=max_worker_rss,
+                      minimum_sampled_available_ram_bytes=min_available_ram,
+                      maximum_sampled_swap_growth_bytes=max_swap_growth,
+                      resource_sample_count=resource_samples)
         write(path / "status.json", record)
     except BaseException:
         terminate_children(active, record)
@@ -547,8 +586,8 @@ def launch(args) -> None:
         clean_git_sha()
         if args.outer_study not in range(1, 6):
             raise ValueError("GradNorm HPO requires --outer-study 1..5")
-        if args.trial_limit is None or not 11 <= args.trial_limit <= 30:
-            raise ValueError("GradNorm HPO requires --trial-limit 11..30")
+        if args.trial_limit is None or not 11 <= args.trial_limit <= 150:
+            raise ValueError("GradNorm HPO requires --trial-limit 11..150")
         config = {**CONFIG, "kind": "gradnorm_hpo", "outer_study": args.outer_study,
                   "folds": [1], "processes": 1, "fold_workers": 2,
                   "threads_each": 1, "epochs": 100,

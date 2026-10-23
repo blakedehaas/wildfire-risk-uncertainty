@@ -101,12 +101,13 @@ def run_resumable_trial(*, trial: optuna.Trial, outer_study: int,
         folds = []
         if concurrent:
             missing = [fold for fold in range(1, 6) if epoch > completed[fold]]
-            results = provider.run_epoch(epoch, missing) if missing else {}
-            new_records = {}
-            for fold in range(1, 6):
-                if epoch <= completed[fold]:
-                    record = read_json(local.path / f"fold_{fold}_epoch_{epoch:03d}.json")
-                else:
+            # Commit each two-worker batch before starting the next folds. A stop
+            # after three persisted folds reuses all three checkpoints.
+            for offset in range(0, len(missing), 2):
+                batch = missing[offset:offset + 2]
+                results = provider.run_epoch(epoch, batch)
+                new_records = {}
+                for fold in batch:
                     training, validation = results[fold]
                     steps[fold] += training["optimizer_steps"]
                     record = fold_epoch_record(
@@ -116,14 +117,17 @@ def run_resumable_trial(*, trial: optuna.Trial, outer_study: int,
                         milestone=epoch in MILESTONES,
                         reference=references[fold] if references is not None else None)
                     new_records[fold] = record
-                folds.append(record)
-            if new_records:
+                checkpoint_started = time.perf_counter()
                 provider.save_many({fold: (epoch, steps[fold]) for fold in new_records})
+                checkpoint_seconds = (time.perf_counter() - checkpoint_started) / len(new_records)
                 for fold, record in new_records.items():
+                    record["checkpoint_wall_seconds"] = checkpoint_seconds
                     local.fold(record)
                     tracker.fold(record)
                     completed[fold] = epoch
                 provider.cleanup_many({fold: epoch for fold in new_records})
+            folds = [read_json(local.path / f"fold_{fold}_epoch_{epoch:03d}.json")
+                     for fold in range(1, 6)]
         else:
             for fold in range(1, 6):
                 if epoch <= completed[fold]:

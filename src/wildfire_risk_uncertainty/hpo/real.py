@@ -3,6 +3,7 @@
 import csv
 import hashlib
 import signal
+import subprocess
 import time
 from pathlib import Path
 
@@ -18,7 +19,15 @@ from wildfire_risk_uncertainty.hpo.objective import run_trial
 from wildfire_risk_uncertainty.hpo.records import read_json, write_json
 from wildfire_risk_uncertainty.hpo.resume import run_resumable_trial
 from wildfire_risk_uncertainty.hpo.skill import fold_references
-from wildfire_risk_uncertainty.hpo.storage import metadata, open_study, study_name
+from wildfire_risk_uncertainty.hpo.storage import (
+    initialize_trial_limit,
+    metadata,
+    open_study,
+    restore_sampler_state,
+    save_sampler_state,
+    study_controller_lock,
+    study_name,
+)
 from wildfire_risk_uncertainty.hpo.wandb_tracking import OnlineTracker
 from wildfire_risk_uncertainty.training.cache import HpoCache
 from wildfire_risk_uncertainty.training.cache_checkpoint import (
@@ -270,8 +279,22 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
     """Prepared GradNorm HPO entry point; objective review is a launch gate."""
     if not gradnorm_objective_reviewed:
         raise RuntimeError("Explicit reviewed-objective launch flag is required for GradNorm HPO")
-    if trial_limit is None or not 11 <= trial_limit <= 30:
-        raise ValueError("GradNorm HPO requires an explicit 11..30-trial study limit")
+    if trial_limit is None or not 11 <= trial_limit <= 150:
+        raise ValueError("GradNorm HPO requires an explicit 11..150-trial study limit")
+    if not (root / ".git").exists():
+        raise ValueError("GradNorm HPO requires a repository root")
+    if subprocess.check_output(["git", "status", "--porcelain"], cwd=root):
+        raise RuntimeError("GradNorm HPO requires a clean committed worktree")
+    storage_file = root / "artifacts/hpo" / f"outer_{outer_study}_gradnorm_v3.sqlite3"
+    with study_controller_lock(storage_file):
+        _run_real_hpo_locked(root, outer_study, cache_dir=cache_dir,
+                             pause_after_epoch=pause_after_epoch, trial_limit=trial_limit,
+                             external_stop_file=external_stop_file)
+
+
+def _run_real_hpo_locked(root: Path, outer_study: int, *, cache_dir: Path,
+                         pause_after_epoch: int | None, trial_limit: int,
+                         external_stop_file: Path | None) -> None:
     from wildfire_risk_uncertainty.hpo.fold_workers import PersistentFoldProvider
     from wildfire_risk_uncertainty.training.cache_states import load_states
 
@@ -281,16 +304,18 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
     if not plan["accepted_mmap_for_6f"] or plan["cache_manifest_sha256"] != cache_sha:
         raise ValueError("Validated HPO cache acceptance/provenance mismatch")
     provenance = {**metadata(root, outer_study, kind="gradnorm_hpo"),
-                  "trial_limit": trial_limit,
                   "cache_version": cache.manifest["version"],
                   "cache_manifest_sha256": cache_sha,
                   "partition_offsets_sha256": cache.manifest["files_sha256"]["partition_offsets.npy"]}
     references = fold_references(cache, root, outer_study)
     provenance["inner_fold_constant_references"] = {str(k): v for k, v in references.items()}
     states = load_states(root, cache, outer_study)
+    provenance["preprocessing_hashes_by_fold"] = {str(k): states[k].digest() for k in states}
     name = study_name(outer_study, gradnorm=True)
     artifact = root / "artifacts/hpo"
     study = open_study(artifact / f"outer_{outer_study}_gradnorm_v3.sqlite3", name, provenance)
+    initialize_trial_limit(study, trial_limit)
+    restore_sampler_state(study)
     requested_pause = False
 
     def request_pause(_signal: int, _frame: object) -> None:
@@ -326,6 +351,7 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
             trial = study.ask()
             configuration = suggest(trial)
             trial.set_user_attr("suggested_configuration", configuration.serializable())
+            save_sampler_state(study, trial.number)
         execution = {"inner_fold_workers": 2, "persistent_workers": True,
                      "common_epoch_barrier": True, "optuna_n_jobs": 1}
         saved_execution = trial.user_attrs.get("fold_execution")
@@ -368,7 +394,8 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
             study.tell(trial, state=optuna.trial.TrialState.PRUNED)
             if requested_pause:
                 return
-        except Exception:
+        except Exception as exc:
+            trial.set_user_attr("failure", {"type": type(exc).__name__, "message": str(exc)})
             study.tell(trial, state=optuna.trial.TrialState.FAIL)
             raise
         else:

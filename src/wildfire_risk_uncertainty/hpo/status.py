@@ -28,11 +28,11 @@ def status(root: Path, outer_study: int, *, gradnorm: bool = False) -> dict:
             attributes = connection.execute(
                 "SELECT a.value_json FROM study_user_attributes AS a "
                 "JOIN studies AS s ON a.study_id = s.study_id "
-                "WHERE s.study_name = ? AND a.key = 'frozen_metadata'", (name,),
+                "WHERE s.study_name = ? AND a.key = 'trial_budget'", (name,),
             ).fetchone()
             if attributes is None:
-                raise ValueError("GradNorm study lacks frozen metadata")
-            limit = int(json.loads(attributes[0])["trial_limit"])
+                raise ValueError("GradNorm study lacks persisted lifetime trial limit")
+            limit = int(json.loads(attributes[0])["current"])
     counts = {state: sum(value == state for _, value in rows)
               for state in ("COMPLETE", "PRUNED", "FAIL", "RUNNING", "WAITING")}
     running = [number for number, state in rows if state == "RUNNING"]
@@ -43,9 +43,11 @@ def status(root: Path, outer_study: int, *, gradnorm: bool = False) -> dict:
         active = {"trial_number": running[0],
                   "last_common_epoch": int(aggregates[-1].stem.split("_")[-1]) if aggregates else 0,
                   "fold_epoch_records": len(list(record.glob("fold_*_epoch_*.json")))}
-    state = "in_progress" if running or len(rows) < limit else "budget_reached"
+    state = ("failed" if counts["FAIL"] else "in_progress" if running or len(rows) < limit
+             else "budget_reached")
     return {"study": name, "state": state, "trials": len(rows),
-            "trial_limit": limit, "trial_states": counts, "active_trial": active}
+            "trial_limit": limit, "pending_trial_slots": max(0, limit - len(rows)),
+            "trial_states": counts, "active_trial": active}
 
 
 def main() -> None:

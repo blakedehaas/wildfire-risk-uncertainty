@@ -118,3 +118,11 @@ The subsequent [production-readiness audit](../../reports/hpo/07b/production_rea
 proposes a first bounded 20-trial outer study, with explicit trial-cap controls,
 resource estimates, status commands, and preserved no-pruning execution.
 It has not launched HPO or authorized the remaining outer studies.
+
+The subsequent persistence audit keeps the scientific objective and search
+space frozen. It records the initially approved 20-trial lifetime cap separately
+from immutable study provenance, with explicit controlled extensions and
+hash-checked fold checkpoint recovery. The
+[operator guide](../../reports/hpo/07b/production_readiness.md#operator-commands)
+documents the commands and reproducibility limits. No HPO study was launched
+or extended during this audit.

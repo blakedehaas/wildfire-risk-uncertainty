@@ -17,9 +17,9 @@ from wildfire_risk_uncertainty.training.preprocessing import stable_json_bytes
 
 
 class ToyProvider:
-    def __init__(self, root: Path, *, interrupt: bool = False) -> None:
+    def __init__(self, root: Path, *, interrupt_fold: int | None = None) -> None:
         self.root = root
-        self.interrupt = interrupt
+        self.interrupt_fold = interrupt_fold
         self.states = {}
 
     def _path(self, fold: int, epoch: int) -> Path:
@@ -40,7 +40,7 @@ class ToyProvider:
 
     def __call__(self, fold: int, epoch: int) -> tuple[dict, dict]:
         self.states[fold] += 1
-        if self.interrupt and epoch == 2 and fold == 3:
+        if self.interrupt_fold == fold and epoch == 2:
             os._exit(37)
         value = 0.2 + fold / 100 + self.states[fold] / 1000
         return raw_metrics(value, 0.8 + value), raw_metrics(value + 0.1, 0.9 + value)
@@ -76,14 +76,15 @@ def phase(root: Path, action: str) -> None:
     tracker = MockTracker()
     result = run_resumable_trial(
         trial=trial, outer_study=1, configuration=FIXED_SMOKE,
-        provider=ToyProvider(local, interrupt=action == "interrupt"),
+        provider=ToyProvider(local, interrupt_fold=(3 if action == "interrupt" else
+                                                  4 if action == "interrupt_after_three" else None)),
         record_root=root / "records", study_name="restart_fixture",
         provenance={"fixture": "synthetic-restart-v1"}, tracker=tracker,
         max_epochs=4, pause_after_epoch=1 if action == "pause" else None)
     if action == "pause":
         if result is not None or study.trials[0].state.name != "RUNNING":
             raise ValueError("Synthetic pause did not preserve RUNNING trial")
-    elif action == "interrupt":
+    elif action in {"interrupt", "interrupt_after_three"}:
         raise AssertionError("Synthetic interruption did not terminate the process")
     else:
         if result is None:
@@ -101,7 +102,8 @@ def phase(root: Path, action: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("baseline", "pause", "interrupt", "resume"))
+    parser.add_argument("action", choices=("baseline", "pause", "interrupt",
+                                           "interrupt_after_three", "resume"))
     parser.add_argument("root", type=Path)
     args = parser.parse_args()
     phase(args.root, args.action)

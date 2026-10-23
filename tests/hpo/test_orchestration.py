@@ -48,12 +48,14 @@ class BatchToyProvider:
         self.penalty = penalty
         self.checkpoints = checkpoints if checkpoints is not None else {}
         self.states = {}
+        self.batches = []
 
     def restore_many(self, completed, steps):
         self.states = {fold: self.checkpoints.get((fold, completed[fold]), 0)
                        for fold in range(1, 6)}
 
     def run_epoch(self, epoch, folds):
+        self.batches.append((epoch, tuple(folds)))
         result = {}
         for fold in folds:
             self.states[fold] += 1
@@ -426,10 +428,13 @@ def test_concurrent_batch_pause_resume_has_no_duplicate_records(tmp_path) -> Non
     common = {"trial": trial, "outer_study": 1, "configuration": configuration,
               "record_root": tmp_path, "study_name": "resume_fixture",
               "provenance": {"fixture": True}, "max_epochs": 4}
+    initial_provider = BatchToyProvider(0.0, checkpoints)
     result = run_resumable_trial(
-        **common, provider=BatchToyProvider(0.0, checkpoints), tracker=tracker,
+        **common, provider=initial_provider, tracker=tracker,
         pause_after_epoch=2)
     assert result is None and study.trials[0].state.name == "RUNNING"
+    assert initial_provider.batches == [(epoch, folds) for epoch in (1, 2)
+                                        for folds in ((1, 2), (3, 4), (5,))]
     run_id = read_json(tmp_path / "resume_fixture/trial_000/wandb_link.json")["run_id"]
     resumed_tracker = MockTracker()
     result = run_resumable_trial(
