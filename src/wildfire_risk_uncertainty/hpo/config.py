@@ -11,6 +11,7 @@ SCHEMA_VERSION = "nested-spatial-hpo-v1"
 TRAINING_VERSION = "checkpoint-6d-frozen-v1"
 GRADNORM_TRAINING_VERSION = "checkpoint-07a-gradnorm-ce-epoch1-v2"
 SEED = 42
+TPE_STARTUP_TRIALS = 10
 MILESTONES = (1, 4, 16, 64)
 MAX_EPOCHS = 100
 SEARCH_SPACE = {
@@ -52,7 +53,7 @@ def suggest(trial: optuna.Trial) -> Configuration:
 
 
 def sampler() -> optuna.samplers.TPESampler:
-    return optuna.samplers.TPESampler(seed=SEED)
+    return optuna.samplers.TPESampler(seed=SEED, n_startup_trials=TPE_STARTUP_TRIALS)
 
 
 def pruner() -> optuna.pruners.SuccessiveHalvingPruner:

@@ -265,10 +265,13 @@ def run_smoke(root: Path) -> dict:
 def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
                  pause_after_epoch: int | None = None,
                  gradnorm_objective_reviewed: bool = False,
+                 trial_limit: int | None = None,
                  external_stop_file: Path | None = None) -> None:
     """Prepared GradNorm HPO entry point; objective review is a launch gate."""
     if not gradnorm_objective_reviewed:
         raise RuntimeError("Explicit reviewed-objective launch flag is required for GradNorm HPO")
+    if trial_limit is None or not 11 <= trial_limit <= 30:
+        raise ValueError("GradNorm HPO requires an explicit 11..30-trial study limit")
     from wildfire_risk_uncertainty.hpo.fold_workers import PersistentFoldProvider
     from wildfire_risk_uncertainty.training.cache_states import load_states
 
@@ -278,6 +281,7 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
     if not plan["accepted_mmap_for_6f"] or plan["cache_manifest_sha256"] != cache_sha:
         raise ValueError("Validated HPO cache acceptance/provenance mismatch")
     provenance = {**metadata(root, outer_study, kind="gradnorm_hpo"),
+                  "trial_limit": trial_limit,
                   "cache_version": cache.manifest["version"],
                   "cache_manifest_sha256": cache_sha,
                   "partition_offsets_sha256": cache.manifest["files_sha256"]["partition_offsets.npy"]}
@@ -299,12 +303,12 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
         if requested_pause or (external_stop_file is not None and external_stop_file.exists()):
             return
         trials = study.get_trials(deepcopy=True)
-        if len(trials) > 30 or any(t.state == optuna.trial.TrialState.FAIL for t in trials):
-            raise ValueError("Real study exceeded 30 trials or contains FAILED trial; stop for HITL")
+        if len(trials) > trial_limit or any(t.state == optuna.trial.TrialState.FAIL for t in trials):
+            raise ValueError("Real study exceeded its trial limit or contains FAILED trial")
         running = [t for t in trials if t.state == optuna.trial.TrialState.RUNNING]
         if len(running) > 1:
             raise ValueError("More than one RUNNING trial in frozen single-worker study")
-        if not running and len(trials) == 30:
+        if not running and len(trials) == trial_limit:
             return
         if running:
             trial = optuna.Trial(study, running[0]._trial_id)

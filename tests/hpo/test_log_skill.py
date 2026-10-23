@@ -19,6 +19,14 @@ from wildfire_risk_uncertainty.hpo.wandb_tracking import DisabledTracker
 
 
 def test_constant_references_use_only_corresponding_inner_train(tmp_path: Path) -> None:
+    class ProtectedTargets:
+        def __init__(self, values):
+            self.values = values
+
+        def __getitem__(self, rows):
+            assert isinstance(rows, np.ndarray) and np.all(rows < 10), "Outer TEST target read"
+            return self.values[rows]
+
     labels = np.repeat(np.arange(1, 6, dtype=np.uint8), 2)
     bp = np.array([0.9, 0.8, 0.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.3, 0.2], dtype=np.float32)
     valid = np.tile([1, 0], 5).astype(np.uint8)
@@ -27,8 +35,11 @@ def test_constant_references_use_only_corresponding_inner_train(tmp_path: Path) 
         flp[2 * fold] = np.array([0.7, 0.1, 0.05, 0.05, 0.05, 0.05]) if fold == 0 else np.array(
             [0.1, 0.5, 0.1, 0.1, 0.1, 0.1])
     cache = SimpleNamespace(names=["tile"], arrays={
-        "partition_offsets": np.array([0, 10]), "inner_fold": np.tile(labels[:, None], (1, 5)),
-        "bp": bp, "flp": flp, "flp_valid": valid})
+        "partition_offsets": np.array([0, 11]),
+        "inner_fold": np.tile(np.r_[labels, 0][:, None], (1, 5)),
+        "bp": ProtectedTargets(np.r_[bp, np.nan]),
+        "flp": ProtectedTargets(np.vstack((flp, np.full(6, np.nan)))),
+        "flp_valid": ProtectedTargets(np.r_[valid, 0])})
     directory = tmp_path / "reports/spatial_validation/06c/tables"
     directory.mkdir(parents=True)
     with (directory / "target_support_by_inner_fold.csv").open("w", newline="") as handle:

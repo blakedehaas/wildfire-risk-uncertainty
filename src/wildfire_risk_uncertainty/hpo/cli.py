@@ -151,6 +151,7 @@ def main() -> None:
     future = commands.add_parser("real-hpo", help="Prepared GradNorm HPO; objective review required")
     future.add_argument("--outer-study", type=int, choices=range(1, 6), required=True)
     future.add_argument("--cache-dir", type=Path, required=True)
+    future.add_argument("--trial-limit", type=int, required=True)
     future.add_argument("--pause-after-epoch", type=int, choices=range(1, 101))
     future.add_argument("--gradnorm-objective-reviewed", action="store_true", required=True)
     args = parser.parse_args()
@@ -167,6 +168,7 @@ def main() -> None:
         require_online_authentication()
         run_real_hpo(root, args.outer_study, cache_dir=args.cache_dir,
                      pause_after_epoch=args.pause_after_epoch,
+                     trial_limit=args.trial_limit,
                      gradnorm_objective_reviewed=args.gradnorm_objective_reviewed)
 
 

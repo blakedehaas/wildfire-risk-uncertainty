@@ -25,14 +25,16 @@ def fold_references(cache, root: Path, outer_study: int) -> dict[int, dict]:
     offsets = cache.arrays["partition_offsets"]
     for number in range(len(cache.names)):
         start, stop = map(int, offsets[number:number + 2])
-        labels = np.asarray(cache.arrays["inner_fold"][start:stop, outer_study - 1])
-        bp = np.asarray(cache.arrays["bp"][start:stop])
-        valid = np.asarray(cache.arrays["flp_valid"][start:stop], dtype=bool)
+        all_labels = np.asarray(cache.arrays["inner_fold"][start:stop, outer_study - 1])
+        eligible = np.flatnonzero(all_labels != 0) + start
+        labels = all_labels[all_labels != 0]
+        bp = np.asarray(cache.arrays["bp"][eligible])
+        valid = np.asarray(cache.arrays["flp_valid"][eligible], dtype=bool)
         bp_sums += np.bincount(labels, weights=bp, minlength=6)
         bp_counts += np.bincount(labels, minlength=6)
         groups = labels[valid]
         flp_counts += np.bincount(groups, minlength=6)
-        flp = np.asarray(cache.arrays["flp"][start:stop])[valid]
+        flp = np.asarray(cache.arrays["flp"][eligible[valid]])
         for cls in range(6):
             flp_sums[:, cls] += np.bincount(groups, weights=flp[:, cls], minlength=6)
     frozen = support_counts(root, outer_study)

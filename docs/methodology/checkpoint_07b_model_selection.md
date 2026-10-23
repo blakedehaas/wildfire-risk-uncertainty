@@ -113,3 +113,8 @@ logarithmic skill averaged over the five inner folds. This update records the
 new decision without rewriting the authoritative Phase 7A handoff above.
 HPO launch, outer TEST evaluation, and additional methodological experiments
 remain outside the present work.
+
+The subsequent [production-readiness audit](../../reports/hpo/07b/production_readiness.md)
+proposes a first bounded 20-trial outer study, with explicit trial-cap controls,
+resource estimates, status commands, and preserved no-pruning execution.
+It has not launched HPO or authorized the remaining outer studies.

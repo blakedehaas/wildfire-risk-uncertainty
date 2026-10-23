@@ -225,6 +225,7 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
         run_real_hpo(ROOT, config["outer_study"],
                      cache_dir=ROOT / "artifacts/training/hpo_cache_v1",
                      gradnorm_objective_reviewed=True,
+                     trial_limit=config["trial_limit"],
                      external_stop_file=path / "stop.request.json")
         stopped = (path / "stop.request.json").exists()
         write(path / f"fold_{fold}.json", {"outer_study": config["outer_study"],
@@ -546,9 +547,12 @@ def launch(args) -> None:
         clean_git_sha()
         if args.outer_study not in range(1, 6):
             raise ValueError("GradNorm HPO requires --outer-study 1..5")
+        if args.trial_limit is None or not 11 <= args.trial_limit <= 30:
+            raise ValueError("GradNorm HPO requires --trial-limit 11..30")
         config = {**CONFIG, "kind": "gradnorm_hpo", "outer_study": args.outer_study,
                   "folds": [1], "processes": 1, "fold_workers": 2,
                   "threads_each": 1, "epochs": 100,
+                  "trial_limit": args.trial_limit,
                   "reference_run": None, "objective_reviewed": True}
         for previous in RUNS.glob("07a-*/config.json"):
             if (read(previous).get("kind") == "gradnorm_hpo" and
@@ -622,14 +626,14 @@ def resume(experiment_id: str) -> None:
     if config["kind"] == "pareto" and not ALLOW_SUPERSEDED_PARETO:
         raise RuntimeError("Static-alpha Pareto resume was superseded by fixed GradNorm")
     if clean_git_sha() != config["source_git_sha"]:
-        raise RuntimeError("Pareto resume requires the original committed source revision")
+        raise RuntimeError("Detached resume requires the original committed source revision")
     if (len(os.sched_getaffinity(0)) < 8 or available_ram() < 4 * 1024**3 or
             not torch.cuda.is_available() or torch.cuda.mem_get_info()[0] < 8 * 1024**3):
         raise RuntimeError("Validated CPU, guest RAM, and GPU access are required to resume")
     if any(read(previous).get("kind") == config["kind"] and status(previous.parent)["state"] in {
         "starting", "running", "stopping"
     } for previous in RUNS.glob("07a-*/config.json") if previous.parent != path):
-        raise RuntimeError("Another Pareto experiment is active")
+        raise RuntimeError("Another experiment of the same kind is active")
     (path / "stop.request.json").unlink(missing_ok=True)
     if config["kind"] == "pareto":
         for task in config["tasks"]:
@@ -703,6 +707,7 @@ def main() -> None:
                                           "gradnorm_full_fold", "gradnorm_hpo", "pareto", "smoke"],
                        default="full_epoch")
     start.add_argument("--outer-study", type=int, choices=range(1, 6))
+    start.add_argument("--trial-limit", type=int)
     start.add_argument("--gradnorm-objective-reviewed", action="store_true")
     start.add_argument("--smoke-seconds", type=int, default=30)
     for name in ("status", "results", "analyze", "resume", "stop", "finalize", "_supervise"):

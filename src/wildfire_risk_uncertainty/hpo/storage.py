@@ -12,6 +12,7 @@ from wildfire_risk_uncertainty.hpo.config import (
     SCHEMA_VERSION,
     SEARCH_SPACE,
     SEED,
+    TPE_STARTUP_TRIALS,
     TRAINING_VERSION,
     pruner,
     sampler,
@@ -43,7 +44,9 @@ def metadata(root: Path, outer_study: int, *, kind: str = "real_hpo") -> dict:
                                     "initial_reference": "first_epoch_separate_support_mean_CE"},
                 "ranking_objective": "mean_five_inner_folds_of_equal_BP_FLP_validation_log_skill_v1"}
                if kind == "gradnorm_hpo" else {}),
-            "seed": SEED, "sampler": {"name": "TPESampler", "seed": SEED},
+            "seed": SEED, "sampler": {"name": "TPESampler", "seed": SEED,
+                                      **({"n_startup_trials": TPE_STARTUP_TRIALS}
+                                         if kind == "gradnorm_hpo" else {})},
             "pruner": ({"name": "NopPruner"} if kind == "gradnorm_hpo" else
                        {"name": "SuccessiveHalvingPruner", "min_resource": 1,
                         "reduction_factor": 4, "min_early_stopping_rate": 0}),
