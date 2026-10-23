@@ -29,6 +29,7 @@ from wildfire_risk_uncertainty.training.preprocessing import stable_json_bytes
 from wildfire_risk_uncertainty.training.trainer import DATA_ORDER_VERSION
 
 BP_CE_NUMERICAL_REVISION = "bp-ce-zero-tail-softplus-fallback-v1"
+EXTENSION_REPAIR_MARKER = "gradnorm-hpo-extension-provenance-v1"
 
 
 def study_name(outer_study: int, *, gradnorm: bool = False) -> str:
@@ -98,7 +99,15 @@ def _registered_revision_matches(study: optuna.Study, expected: dict) -> bool:
     revision = study.user_attrs.get("numerical_revision")
     if not isinstance(frozen, dict) or not isinstance(revision, dict):
         return False
-    if (revision.get("source_git_sha") != expected.get("source_git_sha") or
+    approved_source = revision.get("source_git_sha")
+    extension = study.user_attrs.get("extension_repair_revision")
+    if extension is not None:
+        if (not isinstance(extension, dict) or
+                extension.get("approved_bp_ce_source_git_sha") != approved_source or
+                extension.get("marker") != EXTENSION_REPAIR_MARKER):
+            return False
+        approved_source = extension.get("source_git_sha")
+    if (approved_source != expected.get("source_git_sha") or
             revision.get("marker") != expected.get("bp_ce_numerical_revision") or
             revision.get("original_source_git_sha") != frozen.get("source_git_sha")):
         return False

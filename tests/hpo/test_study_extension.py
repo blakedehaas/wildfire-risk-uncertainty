@@ -1,5 +1,6 @@
 """Cheap persistent-study controls; no model training."""
 
+import hashlib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,6 +12,8 @@ from wildfire_risk_uncertainty.hpo import operations
 from wildfire_risk_uncertainty.hpo.config import suggest
 from wildfire_risk_uncertainty.hpo.status import status
 from wildfire_risk_uncertainty.hpo.storage import (
+    BP_CE_NUMERICAL_REVISION,
+    EXTENSION_REPAIR_MARKER,
     extend_trial_limit,
     initialize_trial_limit,
     open_study,
@@ -84,8 +87,6 @@ def test_study_controller_lock_rejects_second_owner(tmp_path: Path) -> None:
 
 
 def test_extension_checks_identity_and_active_controller(tmp_path: Path, monkeypatch) -> None:
-    import hashlib
-
     database = tmp_path / "artifacts/hpo/outer_3_gradnorm_v3.sqlite3"
     manifest = {"fixture": True}
     digest = hashlib.sha256(stable_json_bytes(manifest)).hexdigest()
@@ -95,11 +96,7 @@ def test_extension_checks_identity_and_active_controller(tmp_path: Path, monkeyp
     study = open_study(database, "wildfire_outer_3_gradnorm_hpo_v3", frozen)
     initialize_trial_limit(study, 20)
     monkeypatch.setattr(operations.subprocess, "check_output", lambda *args, **kwargs: b"")
-    monkeypatch.setattr(operations, "metadata", lambda *args, **kwargs: frozen)
-    monkeypatch.setattr(operations, "HpoCache", lambda *args, **kwargs:
-                        SimpleNamespace(manifest=manifest))
-    monkeypatch.setattr(operations, "load_states", lambda *args, **kwargs: {
-        1: SimpleNamespace(digest=lambda: "state")})
+    monkeypatch.setattr(operations, "_current_provenance", lambda *args, **kwargs: frozen)
     monkeypatch.setattr(operations, "_active_detached_controller", lambda *args: True)
     with pytest.raises(RuntimeError, match="active"):
         operations.extend(tmp_path, 3, 30)
@@ -109,3 +106,125 @@ def test_extension_checks_identity_and_active_controller(tmp_path: Path, monkeyp
     assert result["study"] == study.study_name
     assert result["trial_limit"] == 30
     assert status(tmp_path, 3, gradnorm=True)["trial_limit"] == 30
+
+
+def test_extension_after_registered_numerical_and_infrastructure_revisions(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    database = tmp_path / "artifacts/hpo/outer_3_gradnorm_v3.sqlite3"
+    frozen = {"kind": "gradnorm_hpo", "source_git_sha": "original",
+              "cache_manifest_sha256": "cache", "inner_fold_constant_references": {"1": "reference"},
+              "preprocessing_hashes_by_fold": {"1": "state"}, "runtime_environment": {"gpu": "same"}}
+    study = open_study(database, "wildfire_outer_3_gradnorm_hpo_v3", frozen)
+    initialize_trial_limit(study, 20)
+    first = study.ask()
+    suggest(first)
+    save_sampler_state(study, first.number)
+    first.report(0.05, step=4)
+    study.tell(first, 0.1)
+    failed = study.ask()
+    suggest(failed)
+    save_sampler_state(study, failed.number)
+    study.tell(failed, state=optuna.trial.TrialState.FAIL)
+    old_trials = [(trial.number, trial.state, trial.params, trial.value,
+                   trial.intermediate_values) for trial in study.trials]
+    old_sampler = study.user_attrs["sampler_state"]
+    study.set_user_attr("numerical_revision", {
+        "source_git_sha": "approved", "original_source_git_sha": "original",
+        "marker": BP_CE_NUMERICAL_REVISION})
+    current = {**frozen, "source_git_sha": "infrastructure",
+               "bp_ce_numerical_revision": BP_CE_NUMERICAL_REVISION}
+    monkeypatch.setattr(operations.subprocess, "check_output", lambda *args, **kwargs: b"")
+    monkeypatch.setattr(operations, "_active_detached_controller", lambda *args: False)
+    monkeypatch.setattr(operations, "_current_provenance", lambda *args: current)
+    with pytest.raises(ValueError, match="source/environment"):
+        operations.extend(tmp_path, 3, 21)
+    study.set_user_attr("extension_repair_revision", {
+        "source_git_sha": "infrastructure", "approved_bp_ce_source_git_sha": "approved",
+        "marker": EXTENSION_REPAIR_MARKER})
+    result = operations.extend(tmp_path, 3, 21)
+    assert result["previous_limit"] == 20
+    assert result["trial_limit"] == 21
+    assert result["existing_trials"] == 2
+    assert result["maximum_new_suggestions"] == 19
+    reopened = operations._study(tmp_path, 3)
+    assert reopened.user_attrs["trial_budget"] == {
+        "initial": 20, "current": 21,
+        "history": [{"from": None, "to": 20}, {"from": 20, "to": 21}]}
+    assert status(tmp_path, 3, gradnorm=True)["trial_limit"] == 21
+    assert reopened.user_attrs["sampler_state"] == old_sampler
+    assert [(trial.number, trial.state, trial.params, trial.value,
+             trial.intermediate_values) for trial in reopened.trials] == old_trials
+    assert sum(t.state == optuna.trial.TrialState.COMPLETE for t in reopened.trials) + 19 == 20
+    current["runtime_environment"] = {"gpu": "changed"}
+    with pytest.raises(ValueError, match="source/environment"):
+        operations.extend(tmp_path, 3, 22)
+    assert operations._study(tmp_path, 3).user_attrs["trial_budget"]["current"] == 21
+
+
+def test_extension_repair_registration_checks_lineage_scope_and_history(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    database = tmp_path / "artifacts/hpo/outer_3_gradnorm_v3.sqlite3"
+    frozen = {"kind": "gradnorm_hpo", "source_git_sha": "original", "cache": "frozen"}
+    study = open_study(database, "wildfire_outer_3_gradnorm_hpo_v3", frozen)
+    initialize_trial_limit(study, 20)
+    complete = study.ask()
+    suggest(complete)
+    save_sampler_state(study, complete.number)
+    study.tell(complete, 0.2)
+    failed = study.ask()
+    suggest(failed)
+    save_sampler_state(study, failed.number)
+    study.tell(failed, state=optuna.trial.TrialState.FAIL)
+    study.set_user_attr("numerical_revision", {
+        "source_git_sha": operations.APPROVED_BP_CE_SOURCE_SHA,
+        "original_source_git_sha": "original", "marker": BP_CE_NUMERICAL_REVISION})
+    current = {**frozen, "source_git_sha": "new-sha",
+               "bp_ce_numerical_revision": BP_CE_NUMERICAL_REVISION}
+    changed = "src/wildfire_risk_uncertainty/hpo/operations.py\n"
+
+    def git_output(args, **kwargs):
+        if args[1] == "status":
+            return b""
+        if args[1] == "diff":
+            return changed
+        raise AssertionError(args)
+
+    monkeypatch.setattr(operations.subprocess, "check_output", git_output)
+    monkeypatch.setattr(operations.subprocess, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(operations, "_active_detached_controller", lambda *args: False)
+    monkeypatch.setattr(operations, "_current_provenance", lambda *args: current)
+    before = [(t.number, t.state, t.value) for t in study.trials]
+    rng = study.user_attrs["sampler_state"]
+    monkeypatch.setattr(operations.subprocess, "check_output", lambda args, **kwargs:
+                        b"" if args[1] == "status" else "src/wildfire_risk_uncertainty/training/trainer.py\n")
+    with pytest.raises(ValueError, match="unauthorized paths"):
+        operations.adopt_extension_repair(tmp_path, 3)
+    monkeypatch.setattr(operations.subprocess, "check_output", git_output)
+    result = operations.adopt_extension_repair(tmp_path, 3)
+    assert result["registered_revision"]["source_git_sha"] == "new-sha"
+    reopened = operations._study(tmp_path, 3)
+    assert [(t.number, t.state, t.value) for t in reopened.trials] == before
+    assert reopened.user_attrs["sampler_state"] == rng
+    assert reopened.user_attrs["trial_budget"]["current"] == 20
+
+
+def test_current_provenance_includes_runner_cache_reference_and_state_fields(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    manifest = {"version": "cache-v1", "files_sha256": {"partition_offsets.npy": "offsets"}}
+    monkeypatch.setattr(operations, "metadata", lambda *args, **kwargs: {"source_git_sha": "new"})
+    monkeypatch.setattr(operations, "HpoCache", lambda *args, **kwargs:
+                        SimpleNamespace(manifest=manifest))
+    monkeypatch.setattr(operations, "load_states", lambda *args, **kwargs: {
+        1: SimpleNamespace(digest=lambda: "state")})
+    monkeypatch.setattr(operations, "fold_references", lambda *args, **kwargs: {
+        1: {"bp_train_probability": 0.1}})
+    value = operations._current_provenance(tmp_path, 3)
+    assert value == {"source_git_sha": "new", "cache_version": "cache-v1",
+                     "cache_manifest_sha256": hashlib.sha256(
+                         stable_json_bytes(manifest)).hexdigest(),
+                     "partition_offsets_sha256": "offsets",
+                     "inner_fold_constant_references": {"1": {"bp_train_probability": 0.1}},
+                     "preprocessing_hashes_by_fold": {"1": "state"}}

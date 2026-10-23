@@ -12,9 +12,11 @@ import optuna
 
 from wildfire_risk_uncertainty.hpo.config import sampler
 from wildfire_risk_uncertainty.hpo.records import read_json
+from wildfire_risk_uncertainty.hpo.skill import fold_references
 from wildfire_risk_uncertainty.hpo.status import status
 from wildfire_risk_uncertainty.hpo.storage import (
     BP_CE_NUMERICAL_REVISION,
+    EXTENSION_REPAIR_MARKER,
     _registered_revision_matches,
     extend_trial_limit,
     metadata,
@@ -25,6 +27,14 @@ from wildfire_risk_uncertainty.hpo.storage import (
 from wildfire_risk_uncertainty.training.cache import HpoCache
 from wildfire_risk_uncertainty.training.cache_states import load_states
 from wildfire_risk_uncertainty.training.preprocessing import stable_json_bytes
+
+APPROVED_BP_CE_SOURCE_SHA = "e458da90488b1aee866a095a5e782b8fda162e5e"
+EXTENSION_REPAIR_PATHS = frozenset({
+    "src/wildfire_risk_uncertainty/hpo/operations.py",
+    "src/wildfire_risk_uncertainty/hpo/storage.py",
+    "tests/hpo/test_study_extension.py",
+    "reports/hpo/07b/extension_repair.md",
+})
 
 
 def _database(root: Path, outer_study: int) -> Path:
@@ -85,6 +95,20 @@ def _resource_summary(root: Path, outer_study: int) -> dict:
                                        if "resource_safety_event" in run]}
 
 
+def _current_provenance(root: Path, outer_study: int) -> dict:
+    """Reconstruct the complete fingerprint used by the production runner."""
+    cache = HpoCache(root, root / "artifacts/training/hpo_cache_v1")
+    states = load_states(root, cache, outer_study)
+    return {**metadata(root, outer_study, kind="gradnorm_hpo"),
+            "cache_version": cache.manifest["version"],
+            "cache_manifest_sha256": hashlib.sha256(stable_json_bytes(cache.manifest)).hexdigest(),
+            "partition_offsets_sha256": cache.manifest["files_sha256"]["partition_offsets.npy"],
+            "inner_fold_constant_references": {
+                str(k): value for k, value in fold_references(cache, root, outer_study).items()},
+            "preprocessing_hashes_by_fold": {str(k): value.digest()
+                                             for k, value in states.items()}}
+
+
 def extend(root: Path, outer_study: int, new_limit: int) -> dict:
     if not 11 <= new_limit <= 150:
         raise ValueError("Lifetime trial cap must be 11..150")
@@ -96,18 +120,10 @@ def extend(root: Path, outer_study: int, new_limit: int) -> dict:
             raise RuntimeError("A detached controller is active for this study")
         study = _study(root, outer_study)
         frozen = study.user_attrs.get("frozen_metadata")
-        current = metadata(root, outer_study, kind="gradnorm_hpo")
+        current = _current_provenance(root, outer_study)
         if (not isinstance(frozen, dict) or
                 (frozen != current and not _registered_revision_matches(study, current))):
             raise ValueError("Current source/environment differs from frozen study methodology")
-        cache = HpoCache(root, root / "artifacts/training/hpo_cache_v1")
-        if frozen["cache_manifest_sha256"] != hashlib.sha256(
-            stable_json_bytes(cache.manifest)).hexdigest():
-            raise ValueError("Frozen HPO cache identity differs")
-        states = load_states(root, cache, outer_study)
-        if frozen["preprocessing_hashes_by_fold"] != {str(k): value.digest()
-                                                       for k, value in states.items()}:
-            raise ValueError("Frozen fold preprocessing identity differs")
         restore_sampler_state(study)
         unreviewed = [trial.number for trial in study.trials
                       if trial.state == optuna.trial.TrialState.FAIL and
@@ -130,11 +146,12 @@ def adopt_bp_ce_fix(root: Path, outer_study: int) -> dict:
             raise RuntimeError("A detached controller is active for this study")
         study = _study(root, outer_study)
         frozen = study.user_attrs["frozen_metadata"]
-        current = metadata(root, outer_study, kind="gradnorm_hpo")
+        current = _current_provenance(root, outer_study)
         if current["bp_ce_numerical_revision"] != BP_CE_NUMERICAL_REVISION:
             raise ValueError("Unexpected numerical implementation revision")
         ignored = {"source_git_sha", "bp_ce_numerical_revision"}
-        if any(frozen.get(key) != value for key, value in current.items() if key not in ignored):
+        if ({k: v for k, v in frozen.items() if k not in ignored} !=
+                {k: v for k, v in current.items() if k not in ignored}):
             raise ValueError("Frozen scientific/environment provenance differs")
         if [trial.state.name for trial in study.trials[:2]] != ["COMPLETE", "FAIL"]:
             raise ValueError("Expected completed trial 0 and failed trial 1")
@@ -164,6 +181,56 @@ def adopt_bp_ce_fix(root: Path, outer_study: int) -> dict:
         return {"study": study.study_name, "registered_revision": revision,
                 "trial_0_state": "COMPLETE", "trial_1_state": "FAIL",
                 "trial_limit": study.user_attrs["trial_budget"]["current"]}
+
+
+def adopt_extension_repair(root: Path, outer_study: int) -> dict:
+    """Register the reviewed extension-only source commit without changing trials."""
+    if outer_study != 3:
+        raise ValueError("This repair is specific to outer study 3")
+    if subprocess.check_output(["git", "status", "--porcelain"], cwd=root):
+        raise RuntimeError("Revision adoption requires a clean committed worktree")
+    database = _database(root, outer_study)
+    with study_controller_lock(database):
+        if _active_detached_controller(root, outer_study):
+            raise RuntimeError("A detached controller is active for this study")
+        study = _study(root, outer_study)
+        frozen = study.user_attrs.get("frozen_metadata")
+        numerical = study.user_attrs.get("numerical_revision")
+        if (not isinstance(frozen, dict) or not isinstance(numerical, dict) or
+                numerical.get("source_git_sha") != APPROVED_BP_CE_SOURCE_SHA or
+                numerical.get("original_source_git_sha") != frozen.get("source_git_sha") or
+                numerical.get("marker") != BP_CE_NUMERICAL_REVISION):
+            raise ValueError("Approved BP CE source revision is not registered")
+        subprocess.run(["git", "merge-base", "--is-ancestor", APPROVED_BP_CE_SOURCE_SHA,
+                        "HEAD"], cwd=root, check=True)
+        changed = set(subprocess.check_output(
+            ["git", "diff", "--name-only", APPROVED_BP_CE_SOURCE_SHA, "HEAD"],
+            cwd=root, text=True).splitlines())
+        if not changed or not changed <= EXTENSION_REPAIR_PATHS:
+            raise ValueError(f"Source revision includes unauthorized paths: {sorted(changed)}")
+        current = _current_provenance(root, outer_study)
+        ignored = {"source_git_sha", "bp_ce_numerical_revision"}
+        if ({k: v for k, v in frozen.items() if k not in ignored} !=
+                {k: v for k, v in current.items() if k not in ignored}):
+            raise ValueError("Frozen scientific/environment provenance differs")
+        if (len(study.trials) != 2 or
+                [trial.state.name for trial in study.trials] != ["COMPLETE", "FAIL"] or
+                study.user_attrs["trial_budget"]["current"] != 20):
+            raise ValueError("Study trial history or initial cap differs")
+        restore_sampler_state(study)
+        revision = {"source_git_sha": current["source_git_sha"],
+                    "approved_bp_ce_source_git_sha": APPROVED_BP_CE_SOURCE_SHA,
+                    "marker": EXTENSION_REPAIR_MARKER,
+                    "changed_paths": sorted(changed),
+                    "trial_states_at_registration": ["COMPLETE", "FAIL"],
+                    "trial_limit_at_registration": 20}
+        existing = study.user_attrs.get("extension_repair_revision")
+        if existing is not None and existing != revision:
+            raise ValueError("A different extension repair is already registered")
+        if existing is None:
+            study.set_user_attr("extension_repair_revision", revision)
+        return {"study": study.study_name, "registered_revision": revision,
+                "trial_limit": 20, "trial_states": ["COMPLETE", "FAIL"]}
 
 
 def trial_rows(root: Path, outer_study: int) -> list[dict]:
@@ -236,7 +303,8 @@ def summary(root: Path, outer_study: int) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    for command in ("status", "results", "export", "extend", "adopt-bp-ce-fix"):
+    for command in ("status", "results", "export", "extend", "adopt-bp-ce-fix",
+                    "adopt-extension-repair"):
         item = sub.add_parser(command)
         item.add_argument("--outer-study", type=int, choices=range(1, 6), required=True)
         if command == "export":
@@ -251,6 +319,8 @@ def main() -> None:
         result = extend(root, args.outer_study, args.new_limit)
     elif args.command == "adopt-bp-ce-fix":
         result = adopt_bp_ce_fix(root, args.outer_study)
+    elif args.command == "adopt-extension-repair":
+        result = adopt_extension_repair(root, args.outer_study)
     elif args.command == "results":
         result = trial_rows(root, args.outer_study)
     else:
