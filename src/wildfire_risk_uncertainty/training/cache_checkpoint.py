@@ -40,6 +40,10 @@ def save_cache_checkpoint(path: Path, model: torch.nn.Module, optimizer: torch.o
                           state: PreprocessingState, metadata: dict,
                           gradnorm: "GradNorm | None" = None,
                           scheduler: torch.optim.lr_scheduler.LRScheduler | None = None) -> None:
+    if (path.exists() or path.with_suffix(".tmp").exists() or
+            path.with_suffix(path.suffix + ".sha256.json").exists() or
+            path.with_name(path.name + ".sha256.json.tmp").exists()):
+        raise FileExistsError(f"Checkpoint artifact already exists: {path}")
     save_checkpoint(path, model, optimizer, completed_epoch=completed_epoch,
                     global_step=global_step,
                     metadata={**metadata, "cache_binding": cache_binding(cache, state)},

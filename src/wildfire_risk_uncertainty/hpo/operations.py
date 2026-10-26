@@ -10,12 +10,14 @@ from pathlib import Path
 
 import optuna
 
+from wildfire_risk_uncertainty.hpo.checkpoint_audit import valid_common_epoch
 from wildfire_risk_uncertainty.hpo.config import sampler
 from wildfire_risk_uncertainty.hpo.records import read_json
 from wildfire_risk_uncertainty.hpo.skill import fold_references
 from wildfire_risk_uncertainty.hpo.status import status
 from wildfire_risk_uncertainty.hpo.storage import (
     BP_CE_NUMERICAL_REVISION,
+    CHECKPOINT_REPAIR_MARKER,
     EXTENSION_REPAIR_MARKER,
     _registered_revision_matches,
     extend_trial_limit,
@@ -34,6 +36,19 @@ EXTENSION_REPAIR_PATHS = frozenset({
     "src/wildfire_risk_uncertainty/hpo/storage.py",
     "tests/hpo/test_study_extension.py",
     "reports/hpo/07b/extension_repair.md",
+})
+CHECKPOINT_REPAIR_PATHS = frozenset({
+    "src/wildfire_risk_uncertainty/hpo/checkpoint_audit.py",
+    "src/wildfire_risk_uncertainty/hpo/operations.py",
+    "src/wildfire_risk_uncertainty/hpo/real.py",
+    "src/wildfire_risk_uncertainty/hpo/records.py",
+    "src/wildfire_risk_uncertainty/hpo/resume.py",
+    "src/wildfire_risk_uncertainty/hpo/storage.py",
+    "src/wildfire_risk_uncertainty/training/cache_checkpoint.py",
+    "src/wildfire_risk_uncertainty/training/checkpoint.py",
+    "tests/hpo/test_checkpoint_integrity.py",
+    "tests/hpo/test_study_extension.py",
+    "reports/hpo/07b/trial17_checkpoint_integrity.md",
 })
 
 
@@ -125,13 +140,92 @@ def extend(root: Path, outer_study: int, new_limit: int) -> dict:
                 (frozen != current and not _registered_revision_matches(study, current))):
             raise ValueError("Current source/environment differs from frozen study methodology")
         restore_sampler_state(study)
+        reviewed_checkpoint = study.user_attrs.get("checkpoint_repair_revision")
         unreviewed = [trial.number for trial in study.trials
                       if trial.state == optuna.trial.TrialState.FAIL and
                       not trial.user_attrs.get("failure", {}).get("numerical_failure") and
-                      not (trial.number == 1 and study.user_attrs.get("numerical_revision"))]
+                      not (trial.number == 1 and study.user_attrs.get("numerical_revision")) and
+                      not (trial.number == 17 and isinstance(reviewed_checkpoint, dict) and
+                           reviewed_checkpoint.get("marker") == CHECKPOINT_REPAIR_MARKER)]
         if unreviewed:
             raise ValueError(f"Failed trials require inspection before extension: {unreviewed}")
         return extend_trial_limit(study, new_limit)
+
+
+def adopt_checkpoint_repair(root: Path, outer_study: int) -> dict:
+    """Register reviewed infrastructure code and failure; keep trial 17 FAIL."""
+    if outer_study != 3:
+        raise ValueError("Checkpoint repair registration is specific to outer study 3")
+    if subprocess.check_output(["git", "status", "--porcelain"], cwd=root):
+        raise RuntimeError("Revision adoption requires a clean committed worktree")
+    database = _database(root, outer_study)
+    with study_controller_lock(database):
+        if _active_detached_controller(root, outer_study):
+            raise RuntimeError("A detached controller is active for this study")
+        study = _study(root, outer_study)
+        previous = study.user_attrs.get("extension_repair_revision")
+        if not isinstance(previous, dict) or previous.get("marker") != EXTENSION_REPAIR_MARKER:
+            raise ValueError("Approved extension repair is not registered")
+        base = previous["source_git_sha"]
+        subprocess.run(["git", "merge-base", "--is-ancestor", base, "HEAD"],
+                       cwd=root, check=True)
+        changed = set(subprocess.check_output(
+            ["git", "diff", "--name-only", base, "HEAD"],
+            cwd=root, text=True).splitlines())
+        if not changed or not changed <= CHECKPOINT_REPAIR_PATHS:
+            raise ValueError(f"Source revision includes unauthorized paths: {sorted(changed)}")
+        current = _current_provenance(root, outer_study)
+        frozen = study.user_attrs["frozen_metadata"]
+        ignored = {"source_git_sha", "bp_ce_numerical_revision"}
+        if ({k: v for k, v in frozen.items() if k not in ignored} !=
+                {k: v for k, v in current.items() if k not in ignored}):
+            raise ValueError("Frozen scientific/environment provenance differs")
+        trials = study.trials
+        if (len(trials) != 18 or sum(t.state == optuna.trial.TrialState.COMPLETE for t in trials) != 16 or
+                trials[17].state != optuna.trial.TrialState.FAIL or trials[17].value is not None or
+                "Checkpoint file hash mismatch" not in
+                trials[17].user_attrs.get("failure", {}).get("message", "")):
+            raise ValueError("Trial 17 failure history differs from reviewed evidence")
+        local = root / "artifacts/hpo/records" / study.study_name / "trial_017"
+        manifest = read_json(local / "manifest.json")
+        cache = read_json(root / "artifacts/training/hpo_cache_v1/manifest.json")
+        binding = {"cache_version": cache["version"],
+                   "cache_manifest_sha256": hashlib.sha256(stable_json_bytes(cache)).hexdigest(),
+                   "partition_offsets_sha256": cache["files_sha256"]["partition_offsets.npy"],
+                   "partition_names_sha256": cache["files_sha256"]["partition_names.json"],
+                   "feature_order_sha256": hashlib.sha256(
+                       stable_json_bytes(cache["inputs"])).hexdigest(),
+                   "data_order_version": current["training_configuration"]["data_order_version"]}
+        expected = {}
+        for fold in range(1, 6):
+            state_sha = current["preprocessing_hashes_by_fold"][str(fold)]
+            expected[fold] = {"outer_study": 3, "trial_number": 17, "inner_fold": fold,
+                              "configuration": manifest["configuration"], "seed": 42,
+                              "loss_balancing": "gradnorm", "gradnorm_alpha": 1.5,
+                              "gradnorm_training_version": current["training_implementation_version"],
+                              "cache_binding": {**binding, "preprocessing_sha256": state_sha}}
+        if (manifest["provenance"] != frozen and
+                manifest["provenance"].get("source_git_sha") != base):
+            raise ValueError("Trial 17 manifest provenance differs")
+        if (len(list(local.glob("fold_*_epoch_*.json"))) != 307 or
+                valid_common_epoch(local, expected) != 61 or
+                any((local / "checkpoints" / f"fold_{fold}_epoch_062.pt").stat().st_size != 0
+                    for fold in (1, 2))):
+            raise ValueError("Trial 17 checkpoint evidence differs")
+        restore_sampler_state(study)
+        revision = {"marker": CHECKPOINT_REPAIR_MARKER,
+                    "source_git_sha": current["source_git_sha"],
+                    "previous_source_git_sha": base,
+                    "changed_paths": sorted(changed),
+                    "excluded_trial": 17, "trial_17_state": "FAIL",
+                    "latest_valid_common_epoch": 61}
+        existing = study.user_attrs.get("checkpoint_repair_revision")
+        if existing is not None and existing != revision:
+            raise ValueError("A different checkpoint repair is already registered")
+        if existing is None:
+            study.set_user_attr("checkpoint_repair_revision", revision)
+        return {"study": study.study_name, "registered_revision": revision,
+                "trial_17_state": "FAIL", "trial_limit": study.user_attrs["trial_budget"]["current"]}
 
 
 def adopt_bp_ce_fix(root: Path, outer_study: int) -> dict:
@@ -304,7 +398,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     for command in ("status", "results", "export", "extend", "adopt-bp-ce-fix",
-                    "adopt-extension-repair"):
+                    "adopt-extension-repair", "adopt-checkpoint-repair"):
         item = sub.add_parser(command)
         item.add_argument("--outer-study", type=int, choices=range(1, 6), required=True)
         if command == "export":
@@ -321,6 +415,8 @@ def main() -> None:
         result = adopt_bp_ce_fix(root, args.outer_study)
     elif args.command == "adopt-extension-repair":
         result = adopt_extension_repair(root, args.outer_study)
+    elif args.command == "adopt-checkpoint-repair":
+        result = adopt_checkpoint_repair(root, args.outer_study)
     elif args.command == "results":
         result = trial_rows(root, args.outer_study)
     else:

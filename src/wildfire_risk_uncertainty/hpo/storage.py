@@ -30,6 +30,7 @@ from wildfire_risk_uncertainty.training.trainer import DATA_ORDER_VERSION
 
 BP_CE_NUMERICAL_REVISION = "bp-ce-zero-tail-softplus-fallback-v1"
 EXTENSION_REPAIR_MARKER = "gradnorm-hpo-extension-provenance-v1"
+CHECKPOINT_REPAIR_MARKER = "gradnorm-hpo-checkpoint-durability-v1"
 
 
 def study_name(outer_study: int, *, gradnorm: bool = False) -> str:
@@ -107,6 +108,13 @@ def _registered_revision_matches(study: optuna.Study, expected: dict) -> bool:
                 extension.get("marker") != EXTENSION_REPAIR_MARKER):
             return False
         approved_source = extension.get("source_git_sha")
+    checkpoint_repair = study.user_attrs.get("checkpoint_repair_revision")
+    if checkpoint_repair is not None:
+        if (not isinstance(checkpoint_repair, dict) or
+                checkpoint_repair.get("previous_source_git_sha") != approved_source or
+                checkpoint_repair.get("marker") != CHECKPOINT_REPAIR_MARKER):
+            return False
+        approved_source = checkpoint_repair.get("source_git_sha")
     if (approved_source != expected.get("source_git_sha") or
             revision.get("marker") != expected.get("bp_ce_numerical_revision") or
             revision.get("original_source_git_sha") != frozen.get("source_git_sha")):

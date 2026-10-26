@@ -17,6 +17,11 @@ def write_json(path: Path, value: object) -> None:
         handle.flush()
         os.fsync(handle.fileno())
     temporary.replace(path)
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
 
 
 def read_json(path: Path) -> dict:

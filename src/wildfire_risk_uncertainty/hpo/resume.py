@@ -28,6 +28,10 @@ class ResumableProvider(Protocol):
     def cleanup(self, fold: int, epoch: int) -> None: ...
 
 
+class CheckpointRestoreError(RuntimeError):
+    """Restoration failed before training; leave the Optuna trial RUNNING."""
+
+
 def _existing_folds(local: TrialRecord, max_epochs: int) -> dict[int, int]:
     completed = {}
     for fold in range(1, 6):
@@ -90,11 +94,16 @@ def run_resumable_trial(*, trial: optuna.Trial, outer_study: int,
         steps[fold] = step
     concurrent = all(hasattr(provider, name) for name in
                      ("restore_many", "run_epoch", "save_many", "cleanup_many"))
-    if concurrent:
-        provider.restore_many(completed, steps)
-    else:
-        for fold in range(1, 6):
-            provider.restore(fold, completed[fold], steps[fold])
+    try:
+        if concurrent:
+            provider.restore_many(completed, steps)
+        else:
+            for fold in range(1, 6):
+                provider.restore(fold, completed[fold], steps[fold])
+    except Exception as exc:
+        raise CheckpointRestoreError(
+            "Checkpoint restoration failed; inspect retained artifacts before resuming"
+        ) from exc
     started = time.perf_counter()
     last_common = 0
     for epoch in range(1, max_epochs + 1):

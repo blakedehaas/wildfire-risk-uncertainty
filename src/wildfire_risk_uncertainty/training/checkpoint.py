@@ -1,5 +1,6 @@
 """Epoch-boundary trajectory checkpoints for the 6D engineering validation."""
 
+import os
 import random
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -25,7 +26,14 @@ def save_checkpoint(path: Path, model: torch.nn.Module, optimizer: torch.optim.O
                 "python_rng_state": random.getstate(), "numpy_rng_state": np.random.get_state(),
                 "torch_cpu_rng_state": torch.get_rng_state(),
                 "torch_cuda_rng_state": torch.cuda.get_rng_state_all(), "metadata": metadata}, temporary)
+    with temporary.open("rb") as handle:
+        os.fsync(handle.fileno())
     temporary.replace(path)
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
 
 
 def load_checkpoint(path: Path, model: torch.nn.Module, optimizer: torch.optim.Optimizer,

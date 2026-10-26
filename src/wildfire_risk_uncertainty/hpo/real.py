@@ -18,7 +18,10 @@ from wildfire_risk_uncertainty.hpo.config import (
 )
 from wildfire_risk_uncertainty.hpo.objective import run_trial
 from wildfire_risk_uncertainty.hpo.records import TrialRecord, read_json, write_json
-from wildfire_risk_uncertainty.hpo.resume import run_resumable_trial
+from wildfire_risk_uncertainty.hpo.resume import (
+    CheckpointRestoreError,
+    run_resumable_trial,
+)
 from wildfire_risk_uncertainty.hpo.skill import fold_references
 from wildfire_risk_uncertainty.hpo.storage import (
     initialize_trial_limit,
@@ -411,6 +414,8 @@ def _run_real_hpo_locked(root: Path, outer_study: int, *, cache_dir: Path,
             study.tell(trial, state=optuna.trial.TrialState.PRUNED)
             if requested_pause:
                 return
+        except CheckpointRestoreError:
+            raise  # The controller stops; the exact trial remains RUNNING.
         except Exception as exc:
             numerical = isinstance(exc, FoldWorkerError) and exc.exception_type == "FloatingPointError"
             failure = {"type": exc.exception_type if numerical else type(exc).__name__,

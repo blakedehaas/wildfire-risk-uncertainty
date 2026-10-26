@@ -13,6 +13,7 @@ from wildfire_risk_uncertainty.hpo.config import suggest
 from wildfire_risk_uncertainty.hpo.status import status
 from wildfire_risk_uncertainty.hpo.storage import (
     BP_CE_NUMERICAL_REVISION,
+    CHECKPOINT_REPAIR_MARKER,
     EXTENSION_REPAIR_MARKER,
     extend_trial_limit,
     initialize_trial_limit,
@@ -84,6 +85,44 @@ def test_study_controller_lock_rejects_second_owner(tmp_path: Path) -> None:
         RuntimeError, match="Another controller"
     ), study_controller_lock(database):
         pass
+
+
+def test_reviewed_checkpoint_failure_allows_22_without_changing_trial_history(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    database = tmp_path / "artifacts/hpo/outer_3_gradnorm_v3.sqlite3"
+    frozen = {"kind": "gradnorm_hpo", "source_git_sha": "original"}
+    study = open_study(database, "wildfire_outer_3_gradnorm_hpo_v3", frozen)
+    initialize_trial_limit(study, 21)
+    for number in range(18):
+        trial = study.ask()
+        suggest(trial)
+        save_sampler_state(study, number)
+        if number in (1, 17):
+            study.tell(trial, state=optuna.trial.TrialState.FAIL)
+        else:
+            study.tell(trial, float(number))
+    study.set_user_attr("numerical_revision", {
+        "source_git_sha": "numerical", "original_source_git_sha": "original",
+        "marker": BP_CE_NUMERICAL_REVISION})
+    study.set_user_attr("extension_repair_revision", {
+        "source_git_sha": "extension", "approved_bp_ce_source_git_sha": "numerical",
+        "marker": EXTENSION_REPAIR_MARKER})
+    current = {**frozen, "source_git_sha": "checkpoint",
+               "bp_ce_numerical_revision": BP_CE_NUMERICAL_REVISION}
+    monkeypatch.setattr(operations.subprocess, "check_output", lambda *args, **kwargs: b"")
+    monkeypatch.setattr(operations, "_current_provenance", lambda *args: current)
+    monkeypatch.setattr(operations, "_active_detached_controller", lambda *args: False)
+    with pytest.raises(ValueError, match="source/environment"):
+        operations.extend(tmp_path, 3, 22)
+    study.set_user_attr("checkpoint_repair_revision", {
+        "marker": CHECKPOINT_REPAIR_MARKER, "source_git_sha": "checkpoint",
+        "previous_source_git_sha": "extension", "excluded_trial": 17})
+    before = [(t.number, t.state, t.params, t.value) for t in study.trials]
+    result = operations.extend(tmp_path, 3, 22)
+    assert result["trial_limit"] == 22
+    assert [(t.number, t.state, t.params, t.value) for t in study.trials] == before
+    assert sum(t.state == optuna.trial.TrialState.COMPLETE for t in study.trials) == 16
 
 
 def test_extension_checks_identity_and_active_controller(tmp_path: Path, monkeypatch) -> None:
