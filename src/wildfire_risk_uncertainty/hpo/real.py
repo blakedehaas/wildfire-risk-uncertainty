@@ -24,7 +24,6 @@ from wildfire_risk_uncertainty.hpo.resume import (
 )
 from wildfire_risk_uncertainty.hpo.skill import fold_references
 from wildfire_risk_uncertainty.hpo.storage import (
-    initialize_trial_limit,
     metadata,
     open_study,
     restore_sampler_state,
@@ -283,8 +282,13 @@ def run_real_hpo(root: Path, outer_study: int, *, cache_dir: Path,
     """Prepared GradNorm HPO entry point; objective review is a launch gate."""
     if not gradnorm_objective_reviewed:
         raise RuntimeError("Explicit reviewed-objective launch flag is required for GradNorm HPO")
-    if trial_limit is None or not 11 <= trial_limit <= 150:
-        raise ValueError("GradNorm HPO requires an explicit 11..150-trial study limit")
+    from wildfire_risk_uncertainty.hpo.phase7e import SUCCESS_TARGET, validate_manifest
+
+    if outer_study == 3:
+        raise ValueError("Completed outer study 3 is protected from Phase 7E execution")
+    if trial_limit != SUCCESS_TARGET:
+        raise ValueError("Phase 7E requires exactly five successful trials")
+    validate_manifest(root, outer_study)
     if not (root / ".git").exists():
         raise ValueError("GradNorm HPO requires a repository root")
     if subprocess.check_output(["git", "status", "--porcelain"], cwd=root):
@@ -313,6 +317,11 @@ def _run_real_hpo_locked(root: Path, outer_study: int, *, cache_dir: Path,
         FoldWorkerError,
         PersistentFoldProvider,
     )
+    from wildfire_risk_uncertainty.hpo.phase7e import (
+        ATTEMPT_CAP,
+        next_action,
+        validate_manifest,
+    )
     from wildfire_risk_uncertainty.training.cache_states import load_states
 
     cache = HpoCache(root, cache_dir)
@@ -328,11 +337,28 @@ def _run_real_hpo_locked(root: Path, outer_study: int, *, cache_dir: Path,
     provenance["inner_fold_constant_references"] = {str(k): v for k, v in references.items()}
     states = load_states(root, cache, outer_study)
     provenance["preprocessing_hashes_by_fold"] = {str(k): states[k].digest() for k in states}
+    frozen_protocol = validate_manifest(root, outer_study)
+    expected_study = frozen_protocol["studies"][str(outer_study)]
+    if (provenance["preprocessing_hashes_by_fold"] != expected_study["preprocessing_hashes_by_fold"] or
+            any(provenance[key] != value for key, value in frozen_protocol["data_fingerprints"].items()
+                if key in provenance)):
+        raise ValueError("Runtime data provenance differs from Phase 7E manifest")
+    provenance["phase7e_protocol_sha256"] = hashlib.sha256(stable_json_bytes(frozen_protocol)).hexdigest()
     name = study_name(outer_study, gradnorm=True)
+    provenance["study_name"] = name
     artifact = root / "artifacts/hpo"
     study = open_study(artifact / f"outer_{outer_study}_gradnorm_v3.sqlite3", name, provenance,
                        allow_registered_revision=True)
-    initialize_trial_limit(study, trial_limit)
+    if study.user_attrs.get("trial_budget") is not None:
+        raise ValueError("Phase 7E cannot reuse a lifetime-attempt-budget study")
+    success_budget = {"target": trial_limit, "attempt_cap": ATTEMPT_CAP,
+                      "protocol_sha256": provenance["phase7e_protocol_sha256"]}
+    if study.user_attrs.get("success_budget") is None:
+        if study.trials:
+            raise ValueError("Existing study lacks a success budget")
+        study.set_user_attr("success_budget", success_budget)
+    elif study.user_attrs["success_budget"] != success_budget:
+        raise ValueError("Persisted success budget differs from frozen protocol")
     restore_sampler_state(study)
     requested_pause = False
 
@@ -346,10 +372,13 @@ def _run_real_hpo_locked(root: Path, outer_study: int, *, cache_dir: Path,
         if requested_pause or (external_stop_file is not None and external_stop_file.exists()):
             return
         trials = study.get_trials(deepcopy=True)
-        running = pending_trial(trials, trial_limit)
-        if running is None and len(trials) == trial_limit:
+        action, running_number = next_action(trials, target=trial_limit, attempt_cap=ATTEMPT_CAP)
+        if action == "complete":
             return
-        if running is not None:
+        if action == "exhausted":
+            raise RuntimeError("Phase 7E attempt safety cap reached before five successes")
+        if running_number is not None:
+            running = next(item for item in trials if item.number == running_number)
             trial = optuna.Trial(study, running._trial_id)
             saved = trial.user_attrs.get("suggested_configuration")
             if saved is None:
@@ -357,6 +386,7 @@ def _run_real_hpo_locked(root: Path, outer_study: int, *, cache_dir: Path,
                     raise ValueError("RUNNING trial has local work but no persisted configuration")
                 configuration = suggest(trial)
                 trial.set_user_attr("suggested_configuration", configuration.serializable())
+                save_sampler_state(study, trial.number)
             else:
                 configuration = Configuration(**saved)
                 if configuration.serializable() != trial.params:

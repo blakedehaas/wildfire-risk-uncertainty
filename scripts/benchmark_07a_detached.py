@@ -234,6 +234,7 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
         return
     if config["kind"] == "gradnorm_hpo":
         from wildfire_risk_uncertainty.hpo.real import run_real_hpo
+        from wildfire_risk_uncertainty.hpo.storage import study_name
         from wildfire_risk_uncertainty.hpo.wandb_tracking import (
             require_online_authentication,
         )
@@ -250,7 +251,7 @@ def worker(path: Path, fold: int, parent_pid: int) -> None:
         stopped = (path / "stop.request.json").exists()
         write(path / f"fold_{fold}.json", {"outer_study": config["outer_study"],
                                              "finished_at": utc(), "stopped_early": stopped,
-                                             "hpo_study": f"wildfire_outer_{config['outer_study']}_gradnorm_hpo_v3",
+                                             "hpo_study": study_name(config["outer_study"], gradnorm=True),
                                              "hpo_artifact_root": str(ROOT / "artifacts/hpo")})
         return
     if config["kind"] == "pareto":
@@ -581,13 +582,17 @@ def launch(args) -> None:
             }:
                 raise RuntimeError(f"Another full-fold GradNorm run is active: {previous.parent.name}")
     elif args.kind == "gradnorm_hpo":
+        from wildfire_risk_uncertainty.hpo.phase7e import (
+            SUCCESS_TARGET,
+            validate_manifest,
+        )
+
         if not args.gradnorm_objective_reviewed:
             raise RuntimeError("GradNorm HPO validation objective requires explicit review")
         clean_git_sha()
-        if args.outer_study not in range(1, 6):
-            raise ValueError("GradNorm HPO requires --outer-study 1..5")
-        if args.trial_limit is None or not 11 <= args.trial_limit <= 150:
-            raise ValueError("GradNorm HPO requires --trial-limit 11..150")
+        if args.trial_limit != SUCCESS_TARGET:
+            raise ValueError("Phase 7E requires --trial-limit 5 successful trials")
+        validate_manifest(ROOT, args.outer_study)
         config = {**CONFIG, "kind": "gradnorm_hpo", "outer_study": args.outer_study,
                   "folds": [1], "processes": 1, "fold_workers": 2,
                   "threads_each": 1, "epochs": 100,
@@ -664,6 +669,15 @@ def resume(experiment_id: str) -> None:
         raise RuntimeError("Only a stopped or failed resumable experiment can resume")
     if config["kind"] == "pareto" and not ALLOW_SUPERSEDED_PARETO:
         raise RuntimeError("Static-alpha Pareto resume was superseded by fixed GradNorm")
+    if config["kind"] == "gradnorm_hpo":
+        from wildfire_risk_uncertainty.hpo.phase7e import (
+            SUCCESS_TARGET,
+            validate_manifest,
+        )
+
+        if config["trial_limit"] != SUCCESS_TARGET:
+            raise RuntimeError("Legacy GradNorm HPO cannot resume under Phase 7E")
+        validate_manifest(ROOT, config["outer_study"])
     if clean_git_sha() != config["source_git_sha"]:
         raise RuntimeError("Detached resume requires the original committed source revision")
     if (len(os.sched_getaffinity(0)) < 8 or available_ram() < 4 * 1024**3 or

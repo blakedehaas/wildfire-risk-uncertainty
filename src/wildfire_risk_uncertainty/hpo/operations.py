@@ -125,6 +125,8 @@ def _current_provenance(root: Path, outer_study: int) -> dict:
 
 
 def extend(root: Path, outer_study: int, new_limit: int) -> dict:
+    if outer_study == 3 and (root / "reports/hpo/07e_protocol/protocol_manifest.json").exists():
+        raise RuntimeError("Completed outer study 3 is frozen by Phase 7E")
     if not 11 <= new_limit <= 150:
         raise ValueError("Lifetime trial cap must be 11..150")
     if subprocess.check_output(["git", "status", "--porcelain"], cwd=root):
@@ -153,6 +155,8 @@ def extend(root: Path, outer_study: int, new_limit: int) -> dict:
 
 
 def adopt_checkpoint_repair(root: Path, outer_study: int) -> dict:
+    if outer_study == 3 and (root / "reports/hpo/07e_protocol/protocol_manifest.json").exists():
+        raise RuntimeError("Completed outer study 3 is frozen by Phase 7E")
     """Register reviewed infrastructure code and failure; keep trial 17 FAIL."""
     if outer_study != 3:
         raise ValueError("Checkpoint repair registration is specific to outer study 3")
@@ -229,6 +233,8 @@ def adopt_checkpoint_repair(root: Path, outer_study: int) -> dict:
 
 
 def adopt_bp_ce_fix(root: Path, outer_study: int) -> dict:
+    if outer_study == 3 and (root / "reports/hpo/07e_protocol/protocol_manifest.json").exists():
+        raise RuntimeError("Completed outer study 3 is frozen by Phase 7E")
     """Register a reviewed source revision; never change finished trial state."""
     if outer_study != 3:
         raise ValueError("This numerical recovery is specific to outer study 3")
@@ -278,6 +284,8 @@ def adopt_bp_ce_fix(root: Path, outer_study: int) -> dict:
 
 
 def adopt_extension_repair(root: Path, outer_study: int) -> dict:
+    if outer_study == 3 and (root / "reports/hpo/07e_protocol/protocol_manifest.json").exists():
+        raise RuntimeError("Completed outer study 3 is frozen by Phase 7E")
     """Register the reviewed extension-only source commit without changing trials."""
     if outer_study != 3:
         raise ValueError("This repair is specific to outer study 3")

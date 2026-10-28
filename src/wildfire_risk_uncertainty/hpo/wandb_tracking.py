@@ -107,10 +107,12 @@ class OnlineTracker:
         resume_kwargs = {"id": run_id, "resume": "must"} if run_id is not None else {}
         pruning_tag = ("nop-pruner" if provenance.get("pruner", {}).get("name") == "NopPruner"
                        else "asha")
+        study_identity = provenance.get("study_name", f"outer-{outer_study}")
+        phase = "random-search" if "phase7e_protocol_sha256" in provenance else "tpe"
         self.run = wandb.init(
-            project="wildfire-risk-uncertainty", group=f"outer-{outer_study}",
-            job_type="hpo-trial", name=f"outer-{outer_study}-trial-{trial_number:03d}",
-            tags=[checkpoint, "hpo", "tpe", pruning_tag, f"outer-{outer_study}"],
+            project="wildfire-risk-uncertainty", group=study_identity,
+            job_type="hpo-trial", name=f"{study_identity}-trial-{trial_number:03d}",
+            tags=[checkpoint, "hpo", phase, pruning_tag, f"outer-{outer_study}"],
             config={**configuration, **provenance, "outer_study": outer_study,
                     "trial_number": trial_number}, mode="online", dir=str(local_dir),
             settings=wandb.Settings(init_timeout=45),

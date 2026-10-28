@@ -38,9 +38,9 @@ def test_tpe_startup_and_no_pruning_study_status(tmp_path: Path) -> None:
     assert status(tmp_path, 3, gradnorm=True)["state"] == "budget_reached"
 
 
-@pytest.mark.parametrize("limit", [None, 0, 10, 151])
+@pytest.mark.parametrize("limit", [None, 0, 10, 20, 151])
 def test_invalid_trial_limit_fails_before_data_access(tmp_path: Path, limit: int | None) -> None:
-    with pytest.raises(ValueError, match="11..150-trial"):
+    with pytest.raises(ValueError, match="five successful"):
         run_real_hpo(tmp_path, 1, cache_dir=tmp_path / "missing-cache",
                      gradnorm_objective_reviewed=True, trial_limit=limit)
     assert not (tmp_path / "artifacts").exists()

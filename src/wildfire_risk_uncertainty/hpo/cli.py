@@ -165,6 +165,14 @@ def main() -> None:
     elif args.command == "real-smoke":
         real_smoke_validation(root)
     else:
+        from wildfire_risk_uncertainty.hpo.phase7e import (
+            SUCCESS_TARGET,
+            validate_manifest,
+        )
+
+        if args.trial_limit != SUCCESS_TARGET:
+            raise ValueError("Phase 7E requires --trial-limit 5 successful trials")
+        validate_manifest(root, args.outer_study)
         require_online_authentication()
         run_real_hpo(root, args.outer_study, cache_dir=args.cache_dir,
                      pause_after_epoch=args.pause_after_epoch,

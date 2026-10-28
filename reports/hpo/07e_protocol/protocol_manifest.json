@@ -1,0 +1,183 @@
+{
+  "approved_pilot_commit": "79bae026721fed316a40bda62a0010e192f5be95",
+  "attempt_cap": 25,
+  "data_fingerprints": {
+    "cache_manifest_sha256": "7e3089929d53173b0181ba7245de9e228929dad38d3c4567d2cf5d154bbc196f",
+    "dataset_manifest_sha256": "cc9f650f8ecf580d0dbf485514e89208a03acde2b320014322b3a4d4febaa0ca",
+    "feature_order_sha256": "ff5851a7bf64b21e7f4c91e69cbe17ec8d4186248a67b76c9a6963d88aaea3fe",
+    "feature_schema_sha256": "6be4626e604d0c1ef6e31446227b0f80f531b381df3c3572763fbdc45f97e74f",
+    "inner_fold_manifest_sha256": "c2b9058d25b5691b290a5f1f19961ac9d9e791380ca152ef6473532c1f6685f5",
+    "outer_fold_manifest_sha256": "acbea6ccc253c6ddb610be5cf849582d78e79c7fe8ea6ab3978c0836f18fe7db",
+    "partition_offsets_sha256": "d28e0edf101606a06324bf869cb64646053948845fcb57bb3d139f0da5db9423"
+  },
+  "epochs": 100,
+  "failure_policy": "FAIL retained; replace with next Optuna suggestion until 5 COMPLETE or 25 attempts; RUNNING resumes",
+  "fold_workers": 2,
+  "implementation_files_sha256": {
+    "scripts/benchmark_07a_detached.py": "27af92780495b7241da304a0eec1a66c11267d61d4b7493adf3c8aa5cb714303",
+    "src/wildfire_risk_uncertainty/hpo/config.py": "1dfa1ce12f7ce4024b2bd4a9d086f000255d0ca47b1f07bd2574f3557a77e813",
+    "src/wildfire_risk_uncertainty/hpo/objective.py": "98bbdb1806e0533bc6190ac7368c272efb79e281ed090836bfea855b6c5d355a",
+    "src/wildfire_risk_uncertainty/hpo/phase7e.py": "63fcc0225558524d167243e8e47baa4672467e7b419b693e1845ed7821732277",
+    "src/wildfire_risk_uncertainty/hpo/real.py": "c59579197c529626c143b0081c254c9ece1d206f115b9bf590763babdecab0bb",
+    "src/wildfire_risk_uncertainty/hpo/records.py": "09cd943361b0a157a9a35073a3e0a3c12e1907edbbfe1a2e8da027011457f775",
+    "src/wildfire_risk_uncertainty/hpo/storage.py": "79915809c67641df99230adbed3ee94ebae241ae2c37e8001aee764fe4650244",
+    "src/wildfire_risk_uncertainty/training/trainer.py": "a24ddfa904a3de78bcbe744fee54a35a720cc31820825b12936cfc1ffa08b9a0"
+  },
+  "loss_balancing": {
+    "alpha": 1.5,
+    "method": "GradNorm",
+    "weight_learning_rate": 0.025,
+    "weight_optimizer": "Adam"
+  },
+  "model_selection": "maximum_frozen_objective_among_first_5_COMPLETE_earliest_trial_tie",
+  "objective": "mean_five_inner_folds_of_equal_BP_FLP_validation_log_skill_v1",
+  "outer_studies": [
+    1,
+    2,
+    4,
+    5
+  ],
+  "outer_test_policy": "never used for HPO, protocol, or readiness checks",
+  "pilot_comparable_selection": "best_of_first_5_successes_frozen_objective_earliest_trial_tie",
+  "pilot_outer_study": 3,
+  "pilot_primary_selection": "original_best_of_20_successes_trial_19",
+  "pilot_study_database_sha256": "1f59f6cad111fa90555ae3d116d6786e81535806b009f6e51146b5701cb110f6",
+  "protocol": "phase-7e-five-success-random-search-v1",
+  "pruner": "NopPruner",
+  "reporting": "revised_protocol_geographic_sensitivity; pilot_outer_3_result_separate",
+  "sampler": {
+    "effective_phase": "random startup only for 5 completed successes",
+    "implementation": "Optuna TPESampler",
+    "n_startup_trials": 10,
+    "seed": 42
+  },
+  "search_space": {
+    "batch_size": {
+      "choices": [
+        32768,
+        65536,
+        131072
+      ],
+      "type": "categorical"
+    },
+    "depth": {
+      "choices": [
+        2,
+        3
+      ],
+      "type": "categorical"
+    },
+    "learning_rate": {
+      "high": 0.01,
+      "log": true,
+      "low": 0.0001,
+      "type": "float"
+    },
+    "weight_decay": {
+      "high": 0.01,
+      "log": true,
+      "low": 1e-05,
+      "type": "float"
+    },
+    "width": {
+      "choices": [
+        64,
+        128,
+        256
+      ],
+      "type": "categorical"
+    }
+  },
+  "search_space_sha256": "1bbb3fca352bf444f183ca10263a8d22653d3592d9f3adf42bf10e12cc12de46",
+  "studies": {
+    "1": {
+      "inner_folds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "optuna_study": "wildfire_outer_1_gradnorm_hpo_v3",
+      "outer_partition": 1,
+      "preprocessing_hashes_by_fold": {
+        "1": "fd85a8180485e8ff0f74c3c71864846613f5e27e9a60c38d79e216a7f16e200e",
+        "2": "37f4e9d540e7c314ac5d12204fe0ed04d2904aed3aa4cf2785f7a116d05faf1e",
+        "3": "6c5458d26aa81fbb82d1276dac338fc980f1acdd63777ecc90c8c70e11d7d4d6",
+        "4": "5efd06372f39df378d20ec533c6d7b57db585da48b648a9beb1d4fbc8586255d",
+        "5": "38695ad9ca16e009385edfbda9df0c075cb49771b3d411f1a94281a11488542b"
+      },
+      "record_root": "artifacts/hpo/records/wildfire_outer_1_gradnorm_hpo_v3",
+      "sqlite": "artifacts/hpo/outer_1_gradnorm_v3.sqlite3"
+    },
+    "2": {
+      "inner_folds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "optuna_study": "wildfire_outer_2_gradnorm_hpo_v3",
+      "outer_partition": 2,
+      "preprocessing_hashes_by_fold": {
+        "1": "db2c0e0553c55fa10f6b7d10cf0f8467d02beb45b8744b5f37392f87bd7cb7ab",
+        "2": "6bc7e0aab58c13cf5128f797397d8524245b8d0569ea509dfdad886210754bee",
+        "3": "26354ca79966ff726d40713058e9ff4309aa4edcad4b3aa0e38d4eafc3f35a5d",
+        "4": "34a0524f253e3092e662de538642589a9e0f73dcb9f1d2d5abec6a966e7da60a",
+        "5": "60d35a2606140b414e5aadad31bd9c5bcefba8b3973c3930be1d44bbac294780"
+      },
+      "record_root": "artifacts/hpo/records/wildfire_outer_2_gradnorm_hpo_v3",
+      "sqlite": "artifacts/hpo/outer_2_gradnorm_v3.sqlite3"
+    },
+    "4": {
+      "inner_folds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "optuna_study": "wildfire_outer_4_gradnorm_hpo_v3",
+      "outer_partition": 4,
+      "preprocessing_hashes_by_fold": {
+        "1": "e2217544eb9d77c9bb581eee48722423f1f8b8e1bfa7092df3aaf16e59902c25",
+        "2": "fc708c17f4cb8181698e052a5d78b3e4e49698a0d53e8056bfea8722f4c8983d",
+        "3": "a485d0cf233deb25b1028ed69d5bfb315f4a9457da50b986669ebd47f6de1f77",
+        "4": "fe477b09147bd8180e77d7d9e82b997bd09ec215aadd960c6dc4305d267e5393",
+        "5": "190fe3d62060f1d8eaf57830299404979e78e7908a471e5d4e9219894b0a4f4e"
+      },
+      "record_root": "artifacts/hpo/records/wildfire_outer_4_gradnorm_hpo_v3",
+      "sqlite": "artifacts/hpo/outer_4_gradnorm_v3.sqlite3"
+    },
+    "5": {
+      "inner_folds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "optuna_study": "wildfire_outer_5_gradnorm_hpo_v3",
+      "outer_partition": 5,
+      "preprocessing_hashes_by_fold": {
+        "1": "42c4cd19cc162695eb55c068a932983fd8872690498ab9e80296eaac8a8e3e2e",
+        "2": "7dbc0aa4114a430f3c9b4f7aeb94ce2093eefc136ffaac5d5668bb89c55b9ea1",
+        "3": "845df0d1451e535b954c81abfce45f5a3ad41a35282fe233eaacea13223d9115",
+        "4": "3e00e1388331fed085d2a4c25a76331e18046d7cc084c616abd20c410672ef4d",
+        "5": "ad31ae0e47d1ccd7b428c1af2694f250e2a3cb517f2a44dd62be154af96a85c9"
+      },
+      "record_root": "artifacts/hpo/records/wildfire_outer_5_gradnorm_hpo_v3",
+      "sqlite": "artifacts/hpo/outer_5_gradnorm_v3.sqlite3"
+    }
+  },
+  "success_target": 5,
+  "training": {
+    "data_order_seed": 42,
+    "implementation_version": "checkpoint-07a-gradnorm-ce-epoch1-v2",
+    "initialization_seed": 42,
+    "optimizer": "AdamW",
+    "precision": "BF16 autocast",
+    "scheduler": "none"
+  }
+}

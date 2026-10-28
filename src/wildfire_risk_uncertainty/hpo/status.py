@@ -24,6 +24,7 @@ def status(root: Path, outer_study: int, *, gradnorm: bool = False) -> dict:
             "WHERE s.study_name = ? ORDER BY t.number", (name,),
         ).fetchall()
         limit = 30
+        success_budget = None
         if gradnorm:
             attributes = connection.execute(
                 "SELECT a.value_json FROM study_user_attributes AS a "
@@ -31,8 +32,17 @@ def status(root: Path, outer_study: int, *, gradnorm: bool = False) -> dict:
                 "WHERE s.study_name = ? AND a.key = 'trial_budget'", (name,),
             ).fetchone()
             if attributes is None:
-                raise ValueError("GradNorm study lacks persisted lifetime trial limit")
-            limit = int(json.loads(attributes[0])["current"])
+                success_attr = connection.execute(
+                    "SELECT a.value_json FROM study_user_attributes AS a "
+                    "JOIN studies AS s ON a.study_id = s.study_id "
+                    "WHERE s.study_name = ? AND a.key = 'success_budget'", (name,),
+                ).fetchone()
+                if success_attr is None:
+                    raise ValueError("GradNorm study lacks a persisted budget")
+                success_budget = json.loads(success_attr[0])
+                limit = int(success_budget["attempt_cap"])
+            else:
+                limit = int(json.loads(attributes[0])["current"])
     counts = {state: sum(value == state for _, value in rows)
               for state in ("COMPLETE", "PRUNED", "FAIL", "RUNNING", "WAITING")}
     running = [number for number, state in rows if state == "RUNNING"]
@@ -43,11 +53,16 @@ def status(root: Path, outer_study: int, *, gradnorm: bool = False) -> dict:
         active = {"trial_number": running[0],
                   "last_common_epoch": int(aggregates[-1].stem.split("_")[-1]) if aggregates else 0,
                   "fold_epoch_records": len(list(record.glob("fold_*_epoch_*.json")))}
-    state = ("failed" if counts["FAIL"] else "in_progress" if running or len(rows) < limit
-             else "budget_reached")
+    state = ("budget_reached" if success_budget and counts["COMPLETE"] == success_budget["target"]
+             else "attempt_cap_reached" if success_budget and len(rows) == limit and not running
+             else "failed" if counts["FAIL"] and not success_budget
+             else "in_progress" if running or len(rows) < limit else "budget_reached")
     return {"study": name, "state": state, "trials": len(rows),
             "trial_limit": limit, "pending_trial_slots": max(0, limit - len(rows)),
-            "trial_states": counts, "active_trial": active}
+            "trial_states": counts, "active_trial": active,
+            **({"success_target": success_budget["target"],
+                "remaining_successes": max(0, success_budget["target"] - counts["COMPLETE"])}
+               if success_budget else {})}
 
 
 def main() -> None:
