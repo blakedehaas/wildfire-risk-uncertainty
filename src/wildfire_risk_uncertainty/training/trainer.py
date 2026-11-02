@@ -63,6 +63,11 @@ def device_batch(batch: tuple[np.ndarray, ...], state: PreprocessingState) -> tu
 def _batches(root: Path, state: PreprocessingState, role: str, epoch: int | None,
              outer_study: int, inner_fold: int, batch_size: int,
              cache: "HpoCache | None" = None):
+    if inner_fold == 0:
+        if role != "train" or cache is None:
+            raise ValueError("Final training requires the outer TRAIN cache")
+        return packed_batches(cache.outer_train_chunks(outer_study=outer_study, epoch=epoch,
+                                                       seed=SEED), batch_size)
     return packed_batches(inner_chunks(
         root / "artifacts/dataset/canonical/partitions",
         root / "artifacts/spatial_validation/05b/partitions",

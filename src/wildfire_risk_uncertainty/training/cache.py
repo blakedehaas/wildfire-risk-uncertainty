@@ -226,3 +226,25 @@ class HpoCache:
                 "features", "bp", "flp", "flp_valid"))
             result = (result[0], result[1], result[2], result[3].astype(bool))
             yield (*result, np.asarray(self.arrays["cell_id"][rows])) if include_ids else result
+
+    def outer_train_chunks(self, *, outer_study: int, epoch: int | None,
+                           seed: int = 42) -> Iterator[tuple[np.ndarray, ...]]:
+        """Stream the complete frozen outer TRAIN, without reading outer TEST rows."""
+        if outer_study not in range(1, 6):
+            raise ValueError("Outer study must be 1..5")
+        order = list(range(len(self.names)))
+        rng = np.random.default_rng(np.random.SeedSequence([seed, epoch])) if epoch is not None else None
+        if rng is not None:
+            rng.shuffle(order)
+        offsets = self.arrays["partition_offsets"]
+        for number in order:
+            start, stop = map(int, offsets[number:number + 2])
+            rows = np.flatnonzero(self.arrays["inner_fold"][start:stop, outer_study - 1] != 0) + start
+            if not len(rows):
+                continue
+            if rng is not None:
+                rows = rows[rng.permutation(len(rows))]
+            yield (np.asarray(self.arrays["features"][rows]),
+                   np.asarray(self.arrays["bp"][rows]),
+                   np.asarray(self.arrays["flp"][rows]),
+                   np.asarray(self.arrays["flp_valid"][rows]).astype(bool))
