@@ -1,0 +1,14 @@
+{
+  "phase9_manifest_sha256": "a99f06f93e33cb6361cdd1502e04dbf96aaf606a198af746912317a4e11889fd",
+  "source": "artifacts/evaluation/phase9/phase9-20261104-v1",
+  "full_support_bp_n": 110817231,
+  "pooled_spearman_sample_n": 1097262,
+  "definitions": {
+    "disagreement": "population variance of five BP member probabilities",
+    "error": "absolute difference between ensemble mean BP and FSim BP",
+    "high_error": "top 10% absolute errors within each study",
+    "low_disagreement": "bottom 20% between-member BP variance within each study",
+    "rejection": "largest ranking score within each study",
+    "random": "expected remaining MAE and recall under uniform random rejection"
+  }
+}

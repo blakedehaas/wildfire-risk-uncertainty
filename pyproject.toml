@@ -19,6 +19,7 @@ dependencies = [
     "torch==2.13.0",
     "optuna==5.0.0",
     "wandb==0.30.0",
+    "shap>=0.49,<1",
 ]
 
 [tool.uv.sources]

@@ -1,0 +1,23 @@
+{
+  "phase9_manifest_sha256": "a99f06f93e33cb6361cdd1502e04dbf96aaf606a198af746912317a4e11889fd",
+  "phase10a_failure_table_sha256": "1a1cf5c8788ea762f184a6484f2e8e29c8a7305a07d8e01bab4149163d2ffd3a",
+  "phase10a_failure_counts": {
+    "1": 193365,
+    "2": 174676,
+    "3": 102681,
+    "4": 8939,
+    "5": 134527
+  },
+  "exclusion_radius_m": 211150.99027309995,
+  "distance_source": "artifacts/spatial_validation/05b/partitions/oof_nearest_training_distance_m",
+  "bp_strata": [
+    0.0,
+    0.001,
+    0.005,
+    0.01,
+    1.000001
+  ],
+  "distance_bins": "five equal-count bins within each study",
+  "geography": "100 km EPSG:5070 bins; map displays bins with at least 1,000 TEST cells",
+  "spatial_05b_manifest_sha256": "acbea6ccc253c6ddb610be5cf849582d78e79c7fe8ea6ab3978c0836f18fe7db"
+}
