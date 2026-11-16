@@ -1,0 +1,151 @@
+{
+  "bp_strata_edges": [
+    0.0,
+    0.001,
+    0.005,
+    0.01,
+    1.0
+  ],
+  "cache_manifest_sha256": "7e3089929d53173b0181ba7245de9e228929dad38d3c4567d2cf5d154bbc196f",
+  "dead_complete_sha256": "45fbe01120e1cd18f9ace0d270fda38948398d3b9abbe1a914c4e59f305ba281",
+  "interval": "[max(0,p-q), min(1,p+q)]",
+  "interval_score": "width + 2/alpha*(lower-y) if y<lower + 2/alpha*(y-upper) if y>upper",
+  "nominal_coverage": [
+    0.8,
+    0.9,
+    0.95
+  ],
+  "phase": "11b",
+  "phase8_manifest_sha256": "fe943eed5516f9936897531afde4971a6ce69d75526fe457d0c7e21d4485f35b",
+  "phase9_evaluation_manifest_sha256": "a99f06f93e33cb6361cdd1502e04dbf96aaf606a198af746912317a4e11889fd",
+  "quantile": "ceil((n+1)*coverage) one-based order statistic; infinity if rank > n",
+  "records": [
+    {
+      "checkpoint_sha256": [
+        "835cec666910c1cd9ab043a998da9b74e7a4fda7bfe172023342c8106aaeea4a",
+        "92a4684be42a9d6d846cbe9aca4215c5b6638cde31cd7410439094da27d63fb8",
+        "c0341ba2bae8e24c0fb4d0dc2f52ffec20038e6c5c5fa0538de9f65f60ace6ff",
+        "fc9d3f80f8b7f33754ff579c3e8ab1b9dc3e02a2f6fa78a3b4464ece306dee60",
+        "fb79928927454041355856110249eb1cc80d460b6ada8b7f9d447f3a9e4893b0"
+      ],
+      "dead_prediction_sha256": "5e36ffe88bc2231db56335a8ea3a8a6a7fadad087d90d3985fbb20ebb4d5380b",
+      "dead_sample_sha256": "e1274cf9f9eefd3b0a61664b29f904cb257b6de175be56feb85e4a238b900098",
+      "dead_zone_ids_sha256": "1d5d3b434d4457e7e11d09584ed5e6da248f4ff2b054a045388a26d91cbe04fe",
+      "n_dead_zone": 67293,
+      "n_test": 100000,
+      "n_test_calibration": 50000,
+      "n_test_evaluation": 50000,
+      "phase8_manifest_sha256": "fe943eed5516f9936897531afde4971a6ce69d75526fe457d0c7e21d4485f35b",
+      "preprocessing_sha256": "86e4f355272e53a01350f9046af016372bad735cb7da9454276960d75cd75d64",
+      "seed": 11013,
+      "study": 1,
+      "test_calibration_ids_sha256": "88d192444a2bc6c0273697d5d6161e3e6a6904721cea01b08f77a707b7a724ab",
+      "test_evaluation_ids_sha256": "0789a3fef133e600564b3d17bf5fa0199306158a13f38d6efbf4c4351a2acfa0",
+      "test_prediction_sha256": "82e9cfad384d1a7af1f6aecf4b0492b679fd97a7b88c89848dd73aa8988c1533",
+      "test_sample_sha256": "fc45424149f8ba68a1d637d77a92a5fb057179d77c9c719a826e0f1c2f186ce5"
+    },
+    {
+      "checkpoint_sha256": [
+        "753c48528f112e242fa6f67c40a919959beafc86d159194becd9407f36ee5712",
+        "6f629158fc57290427e7df04665eb0680acde66ecb9006b4a318dd1c2e6cc01d",
+        "7b983e4397c1c8dc0906116064d41525665ea5210613b4bf4d047dcb87f361e3",
+        "43c18ee28853ffe266cc1186de6fa3763a9f42d2f5941b55633f992e20e414b7",
+        "11ddfc601762b70f7ab2819b617dac18b17a0e75f4b149746b1d6cf674a65baf"
+      ],
+      "dead_prediction_sha256": "ed645906cc9e7713d0a7aa097d5a87282a4159cb7d2eeeb7ac2a136e44a0d588",
+      "dead_sample_sha256": "53b030b33468c3d2bb13d392f0d2062271a4609d33fecb365447aa3975e30b36",
+      "dead_zone_ids_sha256": "5f29f059d926165bbfb59e9faed5ce0b93a1d1d64479671934c9ed533cd5e63d",
+      "n_dead_zone": 93909,
+      "n_test": 100000,
+      "n_test_calibration": 50000,
+      "n_test_evaluation": 50000,
+      "phase8_manifest_sha256": "fe943eed5516f9936897531afde4971a6ce69d75526fe457d0c7e21d4485f35b",
+      "preprocessing_sha256": "fcc2bd467e40ceb483d82159ea90eb5970def5c44434a598b5cf366302096500",
+      "seed": 11014,
+      "study": 2,
+      "test_calibration_ids_sha256": "093a221df225a32c62212a761893047235b1ec24ef69821050e776a35e1afed9",
+      "test_evaluation_ids_sha256": "ecd8908f25003130b6ceb11b1fd263eef732a4fc4a64e2a420e783d81bbef53b",
+      "test_prediction_sha256": "d9129f40edad1c4d01324c54bdfdeda6194e2aac5e8915392313c33a5619a20b",
+      "test_sample_sha256": "2052f2fa21ece0630a6e09047844960b59655652b7ebdc100c63c2a7363a953e"
+    },
+    {
+      "checkpoint_sha256": [
+        "73ba9b485b4dacf7ed0d14919860a091cb13fdb93740159c458cf6373fd3ea16",
+        "50230c77ca1c91253c6b7302d9726d9946b8072437a045145701dd8af7e05342",
+        "da5b8250f2904c65e449b9df1c6f2b24c8e8f00cb2388450fc9b9eceb8af7945",
+        "3b63df152ecd5d45faf4ea6453e4e5dbf40403783f13630d6de1a2f765473f22",
+        "64bd2ff44400b0fb2dc4994e5935eac5612c2879f12335885f241986a70a1ee4"
+      ],
+      "dead_prediction_sha256": "03576cc96b64a968092e79a45a267374e015c3fd6e806a32a6cd313f7bf7b03c",
+      "dead_sample_sha256": "528ff33ab9125cbff37b203d8d30e423ef8cf3648b1835baa99a760e354241ad",
+      "dead_zone_ids_sha256": "0884239dc051a7553542450ab4107800911a973a529c2de413e40d7e3923c7c3",
+      "n_dead_zone": 93282,
+      "n_test": 100000,
+      "n_test_calibration": 50000,
+      "n_test_evaluation": 50000,
+      "phase8_manifest_sha256": "fe943eed5516f9936897531afde4971a6ce69d75526fe457d0c7e21d4485f35b",
+      "preprocessing_sha256": "7d86676a4ca74e8fd2887d0cf2c7e8c6b8112863fe27b529ab1e42fec12f79b3",
+      "seed": 11015,
+      "study": 3,
+      "test_calibration_ids_sha256": "38768442d27d80cdbe82a4402e0d8806399eaa07ac53e93f1c2ac96c50a74061",
+      "test_evaluation_ids_sha256": "f7541d0a2706f79211444155136710d025a854aeee69ddef4abbe94e2fcf00e3",
+      "test_prediction_sha256": "f9eccd7bb9ec8e7ef479d46eb38108ebf95af3b3b92d44f5c53ba2281fec836f",
+      "test_sample_sha256": "fd889c400a2a4530bbb0b833fc553187de10e58610f906498b68741a40796e91"
+    },
+    {
+      "checkpoint_sha256": [
+        "84efd229783ce6014196e3b92b27441413cf4c9ec7562edf3dabd604f0933eac",
+        "d494f1cf15bb2c2e0b53437ea415db81dc3d151f25b985387b4672a73bd15daf",
+        "d4124c7cd11b9ed3617d4eab7f695512f48afe00ee469b7722d1d590fac098fc",
+        "6123f3a006f00215612cf5c99cefe19db9d1f5fda9bbed94b09f3edc0383b287",
+        "b0dba06b2a95e927ea0050f085377f1743989e028b0f3a31b658c7a1f0fcd5df"
+      ],
+      "dead_prediction_sha256": "3f87e995f06425cbf48e2e9744d1edfe7ddda20c44e72e9349e4cf30ae9e3fe2",
+      "dead_sample_sha256": "699c53a9ea1c0e4a65c33b28fcbb8e5e5290d1361fb5319f8d23bc4703197443",
+      "dead_zone_ids_sha256": "c3c258c168800bc0d316d93b7a16b62f1e0ad638d4c886c4680cf882aea4fefc",
+      "n_dead_zone": 103871,
+      "n_test": 100000,
+      "n_test_calibration": 50000,
+      "n_test_evaluation": 50000,
+      "phase8_manifest_sha256": "fe943eed5516f9936897531afde4971a6ce69d75526fe457d0c7e21d4485f35b",
+      "preprocessing_sha256": "56718c6991c0ae1f1de221dcdee4b8fe7de4635e7d7317e919a2a83865401eb2",
+      "seed": 11016,
+      "study": 4,
+      "test_calibration_ids_sha256": "e7e1a00bec0e05b8933ccae1c5f8beb77927124a4478a0b2912de85e5ea753c1",
+      "test_evaluation_ids_sha256": "6240e3a81979f49ad4b4889c0e7a835c6f42c58b676883e484df3f50c4d38f15",
+      "test_prediction_sha256": "4c027572fb4d7a180b92603733decd745e9b6f162195ce65c63f87d7457412f9",
+      "test_sample_sha256": "4de58b9546c9f80defc59eae5ad18ac9cf89ead1eff353fe8f4e6e49336d20a4"
+    },
+    {
+      "checkpoint_sha256": [
+        "3a7d069ab5202a70904db0d8bc426e8d391dbc4fc5f2d61888fba8c4b073167b",
+        "edc99cd0f468f6428dea75e7fac101439ab9f436f3246caf4cd5ed335e41301c",
+        "3f34a7aca65d3b6ebf276935266ee697c32cbae31a55d456176c8b432b683b24",
+        "795e5e76efb2a8ca2fbc0ad08728568d6e8f03c035e2e028b4fda0fea352cbc3",
+        "eb7def8b72773449478d9bb3b1a02ef4e21dbe57444e01ffca3e5231e7bad88d"
+      ],
+      "dead_prediction_sha256": "478f6a92d6792558ba37eb8f589e403d3e3fee24b1bb991b0aa3af283b805fa2",
+      "dead_sample_sha256": "ce97855efcc7e6bc63881587dc78f657a6d35845619058e607595bf06a92c592",
+      "dead_zone_ids_sha256": "6db956f08ce2efac82284005a32ca989fa666e8ef75146f868968d1319e59300",
+      "n_dead_zone": 60008,
+      "n_test": 100000,
+      "n_test_calibration": 50000,
+      "n_test_evaluation": 50000,
+      "phase8_manifest_sha256": "fe943eed5516f9936897531afde4971a6ce69d75526fe457d0c7e21d4485f35b",
+      "preprocessing_sha256": "d0ad6726c5cdb4c9b243c64004620a73899961ded2a8b17cfad43ae25a6f844d",
+      "seed": 11017,
+      "study": 5,
+      "test_calibration_ids_sha256": "6c4bc3cc779c3739fd2d66877dc87a5aa681f6704bd03f8d32317f3e7fde79b4",
+      "test_evaluation_ids_sha256": "6c8a650758c6f05e6450e10ca0987aad1a864f8fef0365198e16c863e75365aa",
+      "test_prediction_sha256": "c1946c1bed319f614f0e407b4718d03b7469b6744eeecf91383a4382fff8ef1d",
+      "test_sample_sha256": "67f1095b4f55dadca3a0b8bde6c9721319a62984789909f6b124230c51026b4d"
+    }
+  ],
+  "sampling": "Uniform without replacement from Phase 10C's study-specific SplitMix64 1% TEST sample",
+  "score": "absolute BP reconstruction error",
+  "seed": 11012,
+  "split": "seeded random permutation, floor(n/2) calibration, remainder evaluation",
+  "study_split_seed": "seed + study",
+  "test_complete_sha256": "e078fba2e4b07e2c9550bf4855de312b8b2aab18205f3a7c997ba9333e844a2d",
+  "test_sample_marker_sha256": "d4772782a9135b89537a6b2d3bba6d943befcdf7c28ca7cc5cca1e6f24c50f99"
+}
