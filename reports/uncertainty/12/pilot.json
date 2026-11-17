@@ -1,0 +1,7 @@
+{
+  "pilot_tiles": 2,
+  "pilot_test_n": 8228,
+  "pilot_flp_n": 1793,
+  "pilot_mean_tv": 0.4921561049134587,
+  "train_n": 58623591
+}

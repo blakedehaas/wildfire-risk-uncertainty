@@ -1,0 +1,41 @@
+{
+  "phase9_run": "artifacts/evaluation/phase9/phase9-20261104-v1",
+  "phase9_manifest_sha256": "a99f06f93e33cb6361cdd1502e04dbf96aaf606a198af746912317a4e11889fd",
+  "phase9_predictions_complete_sha256": "fc78b0c5d5c5c8cd7ba10e7069688f2dc05cd037a21c26f43775a404073ece59",
+  "canonical_manifest_sha256": "cc9f650f8ecf580d0dbf485514e89208a03acde2b320014322b3a4d4febaa0ca",
+  "fold_manifest_sha256": "acbea6ccc253c6ddb610be5cf849582d78e79c7fe8ea6ab3978c0836f18fe7db",
+  "phase9_summary_sha256": {
+    "1": "8f49487c9eac240acf37dfdccd24a2167884b9264c32bef9e5bfd62574dbc2d0",
+    "2": "b79883da2bef0d6b843392875e3ebc3fc1235bc2075f96ec486b38adbd6b1620",
+    "3": "1b11e53c1118787b81cc8ae89026dd0bdda3d261c35ac251543e78031e2d6b08",
+    "4": "77c36c69d8679e93b965984266d54321338586382cb6337432a329ec7b57ad78",
+    "5": "ef047560ddd7bb3c41cfd4c7a8ae828441e832b404c8cbe7b2780f8ee986a75f"
+  },
+  "prediction_partition_count": {
+    "1": 343,
+    "2": 351,
+    "3": 385,
+    "4": 393,
+    "5": 499
+  },
+  "canonical_targets": "artifacts/dataset/canonical/partitions",
+  "folds": "artifacts/spatial_validation/05b/partitions",
+  "pilot": {
+    "pilot_tiles": 2,
+    "pilot_test_n": 8228,
+    "pilot_flp_n": 1793,
+    "pilot_mean_tv": 0.4921561049134587,
+    "train_n": 58623591
+  },
+  "definitions": {
+    "valid": "canonical flp_target_valid on frozen Phase 9 outer TEST cell IDs",
+    "tv": "0.5 times the sum of six absolute predicted-minus-reference FLP differences",
+    "disagreement": "sum of six population between-member FLP variances exported by Phase 9",
+    "baseline": "mean six-class target distribution among FLP-valid, train_eligible_fold_i cells",
+    "entropy": "negative sum of p log p over the six ensemble-mean FLP probabilities",
+    "high_error": "largest round(0.10*n) TV errors within study",
+    "rejection": "largest round(fraction*n) ranking scores within study at 5%, 10%, 20%, 50%",
+    "ties": "exact ties broken by ascending cell_id; exact counts via Python round",
+    "random": "uniform random rejection expectation: unchanged remaining mean TV and recall equal to rejected fraction"
+  }
+}
